@@ -39,7 +39,7 @@ class ManagerCircuitBreaker:
             try:
                 output = task_fn(feedback)
                 check = validator_fn(output)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 — any crash becomes retry feedback
                 feedback = f"Unhandled exception ({type(exc).__name__}): {exc}"
                 continue
             if check.passed:

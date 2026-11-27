@@ -3309,42 +3309,42 @@ class CoderAgent(BaseAgent):
             "researcher",
             "ResearcherAgent",
             "Researcher & Log Analyst",
-            "def investigate(\n"
+            ("def investigate(\n"
             "        self, session_id: str, log_path: str, keyword: str, feedback: str | None = None\n"
             "    ) -> dict[str, Any]:\n"
-            "        return dict(self.use_tool(session_id, 'log_reader', log_path=log_path, keyword=keyword))",
+            "        return dict(self.use_tool(session_id, 'log_reader', log_path=log_path, keyword=keyword))"),
         ),
         (
             "reviewer",
             "ReviewerAgent",
             "Code Reviewer",
-            "def review_code(\n"
+            ("def review_code(\n"
             "        self, session_id: str, code_text: str, feedback: str | None = None\n"
             "    ) -> dict[str, Any]:\n"
-            "        return dict(self.use_tool(session_id, 'code_review', code_text=code_text))",
+            "        return dict(self.use_tool(session_id, 'code_review', code_text=code_text))"),
         ),
         (
             "writer_tutor",
             "WriterTutorAgent",
             "Writer & Bilingual CS Tutor",
-            "def recall_context(self, session_id: str, keyword: str) -> dict[str, Any]:\n"
-            "        return dict(self.use_tool(session_id, 'memory_read', keyword=keyword))",
+            ("def recall_context(self, session_id: str, keyword: str) -> dict[str, Any]:\n"
+            "        return dict(self.use_tool(session_id, 'memory_read', keyword=keyword))"),
         ),
         (
             "devops",
             "DevOpsAgent",
             "DevOps Engineer",
-            "def check_service_logs(\n"
+            ("def check_service_logs(\n"
             "        self, session_id: str, log_path: str, keyword: str = 'error'\n"
             "    ) -> dict[str, Any]:\n"
-            "        return dict(self.use_tool(session_id, 'log_reader', log_path=log_path, keyword=keyword))",
+            "        return dict(self.use_tool(session_id, 'log_reader', log_path=log_path, keyword=keyword))"),
         ),
         (
             "security_auditor",
             "SecurityAuditorAgent",
             "Security Auditor",
-            "def audit_snippet(self, session_id: str, code_text: str) -> dict[str, Any]:\n"
-            "        return dict(self.use_tool(session_id, 'code_review', code_text=code_text))",
+            ("def audit_snippet(self, session_id: str, code_text: str) -> dict[str, Any]:\n"
+            "        return dict(self.use_tool(session_id, 'code_review', code_text=code_text))"),
         ),
     ]
     for folder, cls_name, role_desc, method_code in staff_defs:
