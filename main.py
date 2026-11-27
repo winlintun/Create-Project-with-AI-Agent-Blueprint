@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Personal AI Workforce v8 — Interactive Agent CLI Launcher Entrypoint."""
+"""Personal AI Workforce v9 — Interactive Agent CLI Launcher Entrypoint."""
 
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ MENU_ROWS = [
 def show_menu() -> str:
     if HAS_RICH:
         console = Console()
-        table = Table(title="Personal AI Workforce v8 — Agent CLI Launcher")
+        table = Table(title="Personal AI Workforce v9 — Agent CLI Launcher")
         table.add_column("#", style="bold cyan")
         table.add_column("Agent CLI", style="bold green")
         table.add_column("Status")
@@ -48,7 +48,7 @@ def show_menu() -> str:
         console.print(table)
         return console.input("[bold yellow]ရွေးချယ်ပါ (1-5/q): [/]").strip().lower()
 
-    print("\n=== Personal AI Workforce v8 — Agent CLI Launcher ===")
+    print("\n=== Personal AI Workforce v9 — Agent CLI Launcher ===")
     for key, slug, label, desc in MENU_ROWS:
         if slug in AGENT_PROFILES:
             status = "Installed" if validate_agent_available(AGENT_PROFILES[slug]) else "Not Found"
@@ -59,22 +59,47 @@ def show_menu() -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Personal AI Workforce v8 CLI Launcher")
+    parser = argparse.ArgumentParser(description="Personal AI Workforce v9 CLI Launcher")
     parser.add_argument("--agent", choices=list(AGENT_PROFILES.keys()))
+    parser.add_argument(
+        "--workspace",
+        type=Path,
+        default=None,
+        help="Target existing project directory (Pattern B zero-pollution mode)",
+    )
+    parser.add_argument(
+        "--create-branch",
+        default=None,
+        help="Optional new git branch to create in target workspace before launch",
+    )
     parser.add_argument("--demo", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
 
     root = Path(__file__).parent.resolve()
     load_dotenv_file(root / ".env")
+    ws_root = args.workspace.resolve() if args.workspace else None
+
     if args.demo:
         return run_demo_simulation(root)
     if args.agent:
-        return launch_agent(AGENT_PROFILES[args.agent], root, dry_run=args.dry_run)
+        return launch_agent(
+            AGENT_PROFILES[args.agent],
+            root,
+            workspace_root=ws_root,
+            create_branch=args.create_branch,
+            dry_run=args.dry_run,
+        )
     if os.getenv("AUTO_LAUNCH", "false").lower() == "true":
         default_agent = os.getenv("DEFAULT_AGENT", "opencode").lower()
         if default_agent in AGENT_PROFILES:
-            return launch_agent(AGENT_PROFILES[default_agent], root, dry_run=args.dry_run)
+            return launch_agent(
+                AGENT_PROFILES[default_agent],
+                root,
+                workspace_root=ws_root,
+                create_branch=args.create_branch,
+                dry_run=args.dry_run,
+            )
 
     mapping = {"1": "opencode", "2": "claude", "3": "qwen", "4": "agy"}
     while True:
@@ -82,7 +107,13 @@ def main(argv: list[str] | None = None) -> int:
         if choice == "q":
             return 0
         if choice in mapping:
-            return launch_agent(AGENT_PROFILES[mapping[choice]], root, dry_run=args.dry_run)
+            return launch_agent(
+                AGENT_PROFILES[mapping[choice]],
+                root,
+                workspace_root=ws_root,
+                create_branch=args.create_branch,
+                dry_run=args.dry_run,
+            )
         if choice == "5":
             return run_demo_simulation(root)
         print("[!] မမှန်ကန်သော ရွေးချယ်မှု။ 1 မှ 5 သို့မဟုတ် q ကို ရွေးပါ။")

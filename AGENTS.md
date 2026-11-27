@@ -1,4 +1,4 @@
-# Project Context & Agent Instructions (Personal AI Workforce v8)
+# Project Context & Agent Instructions (Personal AI Workforce v9)
 
 ## 1. User Language & Communication Profile (Mandatory)
 - **Primary Language:** Burmese (မြန်မာစာ) — ရိုးရှင်းနားလည်လွယ်အောင် ရှင်းပြရမည်။

@@ -29,7 +29,7 @@ class AutoConsolidator:
             snapshot = dict(self._queue)
             self._queue.clear()
         count = 0
-        for stm, topic, approved in snapshot.values():
+        for (stm, topic, approved) in snapshot.values():
             consolidate_session_to_long_term(stm, self.ltm, topic=topic, ceo_approved=approved)
             count += 1
         return count

@@ -1,4 +1,4 @@
-"""Comprehensive Unit Tests for Personal AI Workforce v8."""
+"""Comprehensive Unit Tests for Personal AI Workforce v9."""
 
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ from tools.log_reader_tool import make_log_reader_tool
 from tools.registry import ToolRegistry
 
 
-class TestPersonalAIWorkforceV8(unittest.TestCase):
+class TestPersonalAIWorkforceV9(unittest.TestCase):
     def test_anthropic_and_gemini_header_auth_without_url_key(self) -> None:
         captured: list[tuple[str, dict[str, str]]] = []
 
@@ -92,6 +92,8 @@ class TestPersonalAIWorkforceV8(unittest.TestCase):
         self.assertFalse(code_review("open('/etc/passwd', 'w').write('x')")["approved"])
         self.assertFalse(code_review("builtins.open('/tmp/x', 'w')")["approved"])
         self.assertFalse(code_review("io.open('/tmp/x', 'a')")["approved"])
+        self.assertFalse(code_review("b.open('/tmp/x', mode='w')")["approved"])
+        self.assertFalse(code_review("Path('/tmp/x').write_text('hi')")["approved"])
         self.assertFalse(code_review("().__class__.__bases__[0].__subclasses__()")["approved"])
         self.assertFalse(code_review("__builtins__['eval']('1+1')")["approved"])
         clean = "def add(a: int, b: int) -> int:\n    return a + b\n"
@@ -271,6 +273,64 @@ class TestPersonalAIWorkforceV8(unittest.TestCase):
         p2 = StructuredContextPayload("Fix", "Logs")
         ans = iter(["y"])
         self.assertTrue(request_cli_approval(p2, input_fn=lambda _p: next(ans)).approved)
+
+
+    def test_pattern_b_workspace_zero_pollution_and_data_guard(self) -> None:
+        from harness.workspace_guard import is_protected_path, validate_branch_name
+
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            wf_root = base / "workforce"
+            (wf_root / "config").mkdir(parents=True)
+            (wf_root / "AGENTS.md").write_text("# WF Rules", encoding="utf-8")
+            (wf_root / "config" / "language_profile.yaml").write_text("lang: my", encoding="utf-8")
+            (wf_root / "config" / "model_tiers.yaml").write_text("t1: {}", encoding="utf-8")
+
+            # Existing project with code, AGENTS.md, and production data
+            existing = base / "IncomeTrackerv1"
+            (existing / "data").mkdir(parents=True)
+            (existing / "main.py").write_text("print('EXISTING_APP')\n", encoding="utf-8")
+            (existing / "AGENTS.md").write_text("# Existing App Rules\n", encoding="utf-8")
+            (existing / "data" / "prod.db").write_text("REAL_DB_BYTES", encoding="utf-8")
+            before_files = sorted(str(p.relative_to(existing)) for p in existing.rglob("*"))
+
+            rc = launch_agent(
+                AGENT_PROFILES["opencode"], wf_root, workspace_root=existing, dry_run=True
+            )
+            self.assertEqual(rc, 0)
+
+            # Verify ZERO files added/modified inside existing project!
+            after_files = sorted(str(p.relative_to(existing)) for p in existing.rglob("*"))
+            self.assertEqual(before_files, after_files)
+            main_txt = (existing / "main.py").read_text(encoding="utf-8")
+            self.assertEqual(main_txt, "print('EXISTING_APP')\n")
+            db_txt = (existing / "data" / "prod.db").read_text(encoding="utf-8")
+            self.assertEqual(db_txt, "REAL_DB_BYTES")
+
+            # Verify all runtime state landed inside workforce/workspaces/IncomeTrackerv1/
+            ws_state = wf_root / "workspaces" / "IncomeTrackerv1"
+            self.assertTrue((ws_state / "opencode.json").exists())
+            self.assertTrue((ws_state / ".workforce_runtime.json").exists())
+            ctx_text = (ws_state / ".opencode_context.md").read_text(encoding="utf-8")
+            self.assertIn("Existing App Rules", ctx_text)
+
+            # Verify Protected Data Paths & Branch Name Validation
+            policy_file = wf_root / "config" / "safety_policy.yaml"
+            policy_file.write_text(
+                "protected_patterns:\n  - data/**\n  - secrets/**\n  - .env\n",
+                encoding="utf-8",
+            )
+            nested_db = existing / "data" / "sub" / "deep" / "prod.db"
+            self.assertTrue(is_protected_path(nested_db, existing, policy_path=policy_file))
+            secret_f = existing / "secrets" / "keys" / "api.key"
+            self.assertTrue(is_protected_path(secret_f, existing, policy_path=policy_file))
+            self.assertTrue(is_protected_path(existing / ".env", existing))
+            self.assertFalse(is_protected_path(existing / "main.py", existing))
+            self.assertEqual(validate_branch_name("ai-workforce/fix-1"), "ai-workforce/fix-1")
+            with self.assertRaises(ValueError):
+                validate_branch_name("--bad-flag")
+            with self.assertRaises(ValueError):
+                validate_branch_name("a..b")
 
 
 if __name__ == "__main__":

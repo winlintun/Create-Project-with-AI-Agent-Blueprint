@@ -17,6 +17,8 @@ logs/trace_logs/*.jsonl
 logs/cost_logs/*.jsonl
 memory_store/short_term/*.json
 memory_store/long_term/*.json
+workspaces/*
+!workspaces/.gitkeep
 
 # Python & Tooling Caches
 __pycache__/
@@ -26,8 +28,3 @@ venv/
 .mypy_cache/
 .ruff_cache/
 .pytest_cache/
-
-1.Personal-Agent-Documents.md
-2.The-Personal-AI-Workforce-Company.md
-3.Best-Practices-for-Managing-the-User-AI.md
-create_personal_agent_blueprint.py

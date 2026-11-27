@@ -24,15 +24,11 @@ DANGEROUS_TEXT_PATTERNS = [
 
 
 def _is_open_write_call(node: ast.Call) -> bool:
-    is_open = isinstance(node.func, ast.Name) and node.func.id == "open"
-    if (
-        not is_open
-        and isinstance(node.func, ast.Attribute)
-        and node.func.attr == "open"
-        and isinstance(node.func.value, ast.Name)
-        and node.func.value.id in {"builtins", "io"}
-    ):
-        is_open = True
+    if isinstance(node.func, ast.Attribute) and node.func.attr in {"write_text", "write_bytes"}:
+        return True
+    is_open = (isinstance(node.func, ast.Name) and node.func.id == "open") or (
+        isinstance(node.func, ast.Attribute) and node.func.attr == "open"
+    )
     if not is_open:
         return False
     mode_arg: ast.expr | None = node.args[1] if len(node.args) >= 2 else None

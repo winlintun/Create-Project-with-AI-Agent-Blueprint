@@ -1,6 +1,6 @@
 [project]
 name = "personal-ai-workforce"
-version = "8.0.0"
+version = "9.0.0"
 description = "Hardened 4-Tier Personal AI Workforce with CLI Launcher & Tiered Models"
 requires-python = ">=3.11"
 

@@ -12,6 +12,8 @@ import subprocess  # nosec B404 — runs fixed docker CLI argv only
 import uuid
 from typing import Any
 
+ALLOWED_DOCKER_CAPS = frozenset({"NET_BIND_SERVICE"})
+
 
 def build_docker_sandbox_cmd(
     python_code: str,
@@ -22,6 +24,7 @@ def build_docker_sandbox_cmd(
     cpus: str = "0.5",
     pids_limit: int = 64,
     runtime: str | None = None,
+    cap_add: tuple[str, ...] = (),
 ) -> tuple[str, list[str]]:
     cname = container_name or f"wf_sbx_{uuid.uuid4().hex[:10]}"
     cmd = [
@@ -37,6 +40,10 @@ def build_docker_sandbox_cmd(
         "--security-opt=no-new-privileges",
         "--user", "65534:65534",
     ]
+    for cap in cap_add:
+        if cap not in ALLOWED_DOCKER_CAPS:
+            raise ValueError(f"Disallowed Docker capability: {cap}")
+        cmd.extend(["--cap-add", cap])
     chosen = runtime or os.getenv("DOCKER_SANDBOX_RUNTIME", "").strip()
     if chosen:
         cmd.append(f"--runtime={chosen}")

@@ -10,12 +10,17 @@ from __future__ import annotations
 import hmac
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Any
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 from harness.validators import ensure_path_within_root, validate_session_id
 
-LOGS_ROOT = Path(__file__).parent.parent / "logs"
+LOGS_ROOT = PROJECT_ROOT / "logs"
 
 
 def read_jsonl_for_session(
