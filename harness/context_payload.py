@@ -6,7 +6,7 @@ import hashlib
 import json
 import uuid
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from harness.validators import validate_session_id
@@ -49,7 +49,7 @@ class StructuredContextPayload:
         if extra_constraints:
             self.constraints.extend(extra_constraints)
         self.ceo_approved = True
-        self.approved_at = datetime.now(timezone.utc).isoformat()
+        self.approved_at = datetime.now(UTC).isoformat()
         self.approval_source = approval_source
         self.approval_digest = self._compute_digest()
 

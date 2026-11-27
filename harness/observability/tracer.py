@@ -5,10 +5,11 @@ from __future__ import annotations
 import json
 import os
 import time
+from collections.abc import Iterator
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 from harness.validators import ensure_path_within_root, validate_session_id
 
@@ -47,7 +48,7 @@ class ObservabilityTracer:
                 self.trace_dir,
                 session_id,
                 {
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "timestamp": datetime.now(UTC).isoformat(),
                     "trace_id": trace_id,
                     "session_id": session_id,
                     "agent": agent,
@@ -70,7 +71,7 @@ class ObservabilityTracer:
         estimated_cost_usd: float,
     ) -> dict[str, Any]:
         entry = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "trace_id": trace_id,
             "session_id": session_id,
             "agent": agent,

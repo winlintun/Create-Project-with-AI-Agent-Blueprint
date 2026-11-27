@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import Any, Awaitable, Callable, TypeVar
+from typing import Any, TypeVar
 
 from agents.base_agent import BaseAgent
 from agents.protocols import StaffRoster

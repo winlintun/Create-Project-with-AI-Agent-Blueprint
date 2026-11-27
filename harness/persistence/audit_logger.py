@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -60,7 +60,7 @@ class AuditLogger:
     ) -> dict[str, Any]:
         safe_id = validate_session_id(session_id)
         entry = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "session_id": safe_id,
             "agent": agent_name,
             "tool": tool_name,
@@ -75,7 +75,7 @@ class AuditLogger:
     ) -> dict[str, Any]:
         safe_id = validate_session_id(session_id)
         entry = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "session_id": safe_id,
             "actor": actor,
             "decision": decision,

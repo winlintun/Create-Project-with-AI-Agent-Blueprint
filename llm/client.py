@@ -13,9 +13,10 @@ import os
 import time
 import urllib.error
 import urllib.request
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 try:
     import yaml  # type: ignore[import-untyped]
@@ -286,7 +287,7 @@ class LLMClient:
         if spec.provider == "anthropic":
             api_key = os.getenv(spec.api_key_env or "ANTHROPIC_API_KEY", "")
             if not api_key:
-                raise EnvironmentError("Missing ANTHROPIC_API_KEY")
+                raise OSError("Missing ANTHROPIC_API_KEY")
             data = self._http_post(
                 "https://api.anthropic.com/v1/messages",
                 headers={
@@ -313,7 +314,7 @@ class LLMClient:
         if spec.provider == "gemini":
             api_key = os.getenv(spec.api_key_env or "GEMINI_API_KEY", "")
             if not api_key:
-                raise EnvironmentError("Missing GEMINI_API_KEY")
+                raise OSError("Missing GEMINI_API_KEY")
             url = (
                 f"https://generativelanguage.googleapis.com/v1beta/models/"
                 f"{spec.model}:generateContent"
@@ -341,7 +342,7 @@ class LLMClient:
             )
             api_key = os.getenv(env_key, "")
             if not api_key:
-                raise EnvironmentError(f"Missing {env_key}")
+                raise OSError(f"Missing {env_key}")
             url = (
                 "https://api.groq.com/openai/v1/chat/completions"
                 if spec.provider == "groq"

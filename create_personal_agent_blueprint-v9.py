@@ -365,7 +365,7 @@ from typing import Any
 
 from harness.env_loader import load_dotenv_file
 from harness.workspace_guard import (
-    PROTECTED_PATTERNS,
+    load_protected_patterns,
     check_git_preflight,
     make_workspace_slug,
     validate_branch_name,
@@ -443,7 +443,9 @@ def _build_combined_context(
         f"# Target Workspace (Existing Project): {workspace_root}",
         "# ZERO-OVERWRITE & DATA PROTECTION POLICY:",
         "# - NEVER delete, truncate, or overwrite existing data files:",
-        "#   " + ", ".join(PROTECTED_PATTERNS),
+        "#   " + ", ".join(
+            load_protected_patterns(workforce_root / "config" / "safety_policy.yaml")
+        ),
         "# - Prefer minimal targeted patches; review diffs with CEO before merging.\\n",
     ]
     for rel in present_files:
@@ -904,7 +906,8 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 try:
     import yaml  # type: ignore[import-untyped]
@@ -1317,10 +1320,10 @@ def ensure_path_within_root(
 
     files["harness/workspace_guard.py"] = """
 \"\"\"
-Workspace Safety Guard (`harness/workspace_guard.py`) — Pattern B Zero-Pollution Protection
-- Checks Git working tree status & branch before launching an AI CLI on an existing project.
-- Protects existing data files (`data/`, `backups/`, `migrations/`, `*.db`, `*.sqlite*`, `.env`).
-- Validates optional branch names strictly to prevent git argument injection.
+Workspace Safety Guard (`harness/workspace_guard.py`) — Pattern B Protection
+- Dynamically loads `config/safety_policy.yaml` at runtime (PyYAML or stdlib fallback).
+- Supports true recursive `**` glob matching via `PurePosixPath.match` + path-part checks.
+- Checks Git working tree status & validates branch names strictly.
 \"\"\"
 
 from __future__ import annotations
@@ -1329,14 +1332,18 @@ import fnmatch
 import re
 import subprocess
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
-PROTECTED_PATTERNS: tuple[str, ...] = (
-    "data/*",
+try:
+    import yaml  # type: ignore[import-untyped]
+
+    HAS_YAML = True
+except ImportError:
+    HAS_YAML = False
+
+DEFAULT_PROTECTED_PATTERNS: tuple[str, ...] = (
     "data/**",
-    "backups/*",
     "backups/**",
-    "migrations/*",
     "migrations/**",
     "*.db",
     "*.sqlite",
@@ -1345,6 +1352,7 @@ PROTECTED_PATTERNS: tuple[str, ...] = (
     ".env",
     ".env.*",
 )
+PROTECTED_PATTERNS = DEFAULT_PROTECTED_PATTERNS
 
 BRANCH_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9/_.-]{0,63}$")
 SAFE_SLUG_RE = re.compile(r"[^A-Za-z0-9_-]+")
@@ -1357,6 +1365,37 @@ class GitGuardStatus:
     is_dirty: bool
     changed_files_count: int
     warnings: tuple[str, ...]
+
+
+def load_protected_patterns(policy_path: Path | None = None) -> tuple[str, ...]:
+    \"\"\"Dynamically loads `protected_patterns` from `config/safety_policy.yaml`.\"\"\"
+    if policy_path is None or not policy_path.is_file():
+        return DEFAULT_PROTECTED_PATTERNS
+    raw = policy_path.read_text(encoding="utf-8")
+    if HAS_YAML:
+        data = yaml.safe_load(raw)
+        if isinstance(data, dict) and isinstance(data.get("protected_patterns"), list):
+            return tuple(str(p) for p in data["protected_patterns"])
+        return DEFAULT_PROTECTED_PATTERNS
+
+    patterns: list[str] = []
+    in_section = False
+    for line in raw.splitlines():
+        clean = line.split("#", 1)[0].rstrip()
+        if not clean.strip():
+            continue
+        if clean.strip() == "protected_patterns:":
+            in_section = True
+            continue
+        if in_section:
+            if not clean.startswith(" "):
+                break
+            stripped = clean.strip()
+            if stripped.startswith("- "):
+                val = stripped[2:].strip().strip('"').strip("'")
+                if val:
+                    patterns.append(val)
+    return tuple(patterns) if patterns else DEFAULT_PROTECTED_PATTERNS
 
 
 def make_workspace_slug(workspace_root: Path) -> str:
@@ -1376,20 +1415,36 @@ def validate_branch_name(branch_name: str) -> str:
     return branch_name
 
 
-def is_protected_path(target_path: Path, workspace_root: Path) -> bool:
+def _matches_recursive_pattern(rel_posix: str, pattern: str) -> bool:
+    rel_path = PurePosixPath(rel_posix)
+    parts = rel_path.parts
+    if pattern.endswith("/**"):
+        prefix = pattern[:-3].strip("/")
+        if rel_posix == prefix or rel_posix.startswith(prefix + "/"):
+            return True
+    if pattern.startswith("**/") and pattern.endswith("/**"):
+        mid = pattern[3:-3].strip("/")
+        if mid in parts:
+            return True
+    if rel_path.match(pattern):
+        return True
+    return fnmatch.fnmatch(rel_posix, pattern) or fnmatch.fnmatch(parts[-1], pattern)
+
+
+def is_protected_path(
+    target_path: Path,
+    workspace_root: Path,
+    *,
+    policy_path: Path | None = None,
+) -> bool:
     root = workspace_root.resolve()
     resolved = target_path.resolve(strict=False)
     try:
         rel = resolved.relative_to(root).as_posix()
     except ValueError:
-        return True  # Outside workspace is always protected
-    parts = rel.split("/")
-    for pat in PROTECTED_PATTERNS:
-        if fnmatch.fnmatch(rel, pat) or fnmatch.fnmatch(parts[-1], pat):
-            return True
-        if pat.endswith("/*") and parts[0] == pat[:-2]:
-            return True
-    return False
+        return True
+    patterns = load_protected_patterns(policy_path)
+    return any(_matches_recursive_pattern(rel, pat) for pat in patterns)
 
 
 def check_git_preflight(workspace_root: Path) -> GitGuardStatus:
@@ -1545,7 +1600,8 @@ class StructuredContextPayload:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 
 @dataclass
@@ -1648,7 +1704,8 @@ class DynamicPlanner:
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Awaitable, Callable
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 
 class AsyncStaffExecutor:
@@ -1678,7 +1735,7 @@ class AsyncStaffExecutor:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable
+from collections.abc import Callable
 
 from harness.context_payload import StructuredContextPayload
 
@@ -1720,7 +1777,8 @@ import time
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterator
+from collections.abc import Iterator
+from typing import Any
 
 from harness.validators import ensure_path_within_root, validate_session_id
 
@@ -2125,12 +2183,17 @@ from __future__ import annotations
 import hmac
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Any
 
-from harness.validators import ensure_path_within_root, validate_session_id
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
-LOGS_ROOT = Path(__file__).parent.parent / "logs"
+from harness.validators import ensure_path_within_root, validate_session_id  # noqa: E402
+
+LOGS_ROOT = PROJECT_ROOT / "logs"
 
 
 def read_jsonl_for_session(
@@ -2251,7 +2314,8 @@ if __name__ == "__main__":
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from harness.persistence.audit_logger import AuditLogger, redact_sensitive_data
 
@@ -2333,6 +2397,9 @@ import uuid
 from typing import Any
 
 
+ALLOWED_DOCKER_CAPS = frozenset({"NET_BIND_SERVICE"})
+
+
 def build_docker_sandbox_cmd(
     python_code: str,
     *,
@@ -2342,6 +2409,7 @@ def build_docker_sandbox_cmd(
     cpus: str = "0.5",
     pids_limit: int = 64,
     runtime: str | None = None,
+    cap_add: tuple[str, ...] = (),
 ) -> tuple[str, list[str]]:
     cname = container_name or f"wf_sbx_{uuid.uuid4().hex[:10]}"
     cmd = [
@@ -2357,6 +2425,10 @@ def build_docker_sandbox_cmd(
         "--security-opt=no-new-privileges",
         "--user", "65534:65534",
     ]
+    for cap in cap_add:
+        if cap not in ALLOWED_DOCKER_CAPS:
+            raise ValueError(f"Disallowed Docker capability: {cap}")
+        cmd.extend(["--cap-add", cap])
     chosen = runtime or os.getenv("DOCKER_SANDBOX_RUNTIME", "").strip()
     if chosen:
         cmd.append(f"--runtime={chosen}")
@@ -2436,15 +2508,11 @@ DANGEROUS_TEXT_PATTERNS = [
 
 
 def _is_open_write_call(node: ast.Call) -> bool:
-    is_open = isinstance(node.func, ast.Name) and node.func.id == "open"
-    if (
-        not is_open
-        and isinstance(node.func, ast.Attribute)
-        and node.func.attr == "open"
-        and isinstance(node.func.value, ast.Name)
-        and node.func.value.id in {"builtins", "io"}
-    ):
-        is_open = True
+    if isinstance(node.func, ast.Attribute) and node.func.attr in {"write_text", "write_bytes"}:
+        return True
+    is_open = (isinstance(node.func, ast.Name) and node.func.id == "open") or (
+        isinstance(node.func, ast.Attribute) and node.func.attr == "open"
+    )
     if not is_open:
         return False
     mode_arg: ast.expr | None = node.args[1] if len(node.args) >= 2 else None
@@ -2505,7 +2573,8 @@ import math
 import re
 from collections import Counter
 from pathlib import Path
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from harness.validators import ensure_path_within_root
 
@@ -2593,7 +2662,8 @@ def web_search(query: str, max_results: int = 3) -> dict[str, Any]:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from harness.validators import ensure_path_within_root
 
@@ -2630,7 +2700,8 @@ def make_log_reader_tool(
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from harness.validators import ensure_path_within_root
 
@@ -2669,7 +2740,8 @@ def make_rag_retrieval_tool(
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from harness.memory.long_term import LongTermMemory
 
@@ -2912,7 +2984,8 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
-from typing import Any, Awaitable, Callable, TypeVar
+from collections.abc import Awaitable, Callable
+from typing import Any, TypeVar
 
 from agents.base_agent import BaseAgent
 from agents.protocols import StaffRoster
@@ -3501,6 +3574,8 @@ class TestPersonalAIWorkforceV9(unittest.TestCase):
         self.assertFalse(code_review("open('/etc/passwd', 'w').write('x')")["approved"])
         self.assertFalse(code_review("builtins.open('/tmp/x', 'w')")["approved"])
         self.assertFalse(code_review("io.open('/tmp/x', 'a')")["approved"])
+        self.assertFalse(code_review("b.open('/tmp/x', mode='w')")["approved"])
+        self.assertFalse(code_review("Path('/tmp/x').write_text('hi')")["approved"])
         self.assertFalse(code_review("().__class__.__bases__[0].__subclasses__()")["approved"])
         self.assertFalse(code_review("__builtins__['eval']('1+1')")["approved"])
         clean = "def add(a: int, b: int) -> int:\\n    return a + b\\n"
@@ -3722,7 +3797,15 @@ class TestPersonalAIWorkforceV9(unittest.TestCase):
             self.assertIn("Existing App Rules", ctx_text)
 
             # Verify Protected Data Paths & Branch Name Validation
-            self.assertTrue(is_protected_path(existing / "data" / "prod.db", existing))
+            policy_file = wf_root / "config" / "safety_policy.yaml"
+            policy_file.write_text(
+                "protected_patterns:\\n  - data/**\\n  - secrets/**\\n  - .env\\n",
+                encoding="utf-8",
+            )
+            nested_db = existing / "data" / "sub" / "deep" / "prod.db"
+            self.assertTrue(is_protected_path(nested_db, existing, policy_path=policy_file))
+            secret_f = existing / "secrets" / "keys" / "api.key"
+            self.assertTrue(is_protected_path(secret_f, existing, policy_path=policy_file))
             self.assertTrue(is_protected_path(existing / ".env", existing))
             self.assertFalse(is_protected_path(existing / "main.py", existing))
             self.assertEqual(validate_branch_name("ai-workforce/fix-1"), "ai-workforce/fix-1")
