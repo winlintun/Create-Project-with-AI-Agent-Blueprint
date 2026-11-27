@@ -1,0 +1,22 @@
+hierarchy:
+  tier_1_ceo:
+    role: "Visionary, Decision-Maker, Final Approver"
+    hitl_modes: ["cli", "web_ui"]
+  tier_2_assistant_ai:
+    role: "Chief of Staff / Prompt Refiner / Gatekeeper"
+    model_tier: 1
+    auto_forward_allowed: false
+    invalidate_approval_on_mutation: true
+  tier_3_manager_ai:
+    role: "Orchestrator / Project Manager"
+    model_tier: 1
+    direct_staff_to_ceo_reporting: false
+    require_ceo_approval_for_memory_write: true
+    max_concurrent_staff: 4
+    circuit_breaker:
+      max_retries_per_step: 2
+      escalate_to_ceo_on_failure: true
+  tier_4_staff_ai:
+    role: "Specialized Executors"
+    model_tier: 2
+    agents: ["researcher", "coder", "reviewer", "writer_tutor", "devops", "security_auditor"]

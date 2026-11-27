@@ -1,0 +1,8 @@
+primary_language: "Burmese (မြန်မာစာ)"
+academic_terminology_language: "Traditional Chinese (繁體中文 - TOCFL B1)"
+english_level: "Basic"
+
+rules:
+  - "အဓိက ရှင်းပြချက်အားလုံးကို မြန်မာစာဖြင့် ရိုးရှင်းနားလည်လွယ်အောင် ရေးသားရမည်။"
+  - "ကျောင်းစာနှင့် CS/Math ဝေါဟာရများကို Traditional Chinese (繁體中文) တွဲဖော်ပြရမည်။"
+  - "Coding/Tech keyword များကို ခက်ခဲသော English မသုံးဘဲ မြန်မာလို တွဲရှင်းပြရမည်။"

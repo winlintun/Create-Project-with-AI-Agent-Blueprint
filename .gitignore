@@ -1,0 +1,28 @@
+# Secrets & Runtime Environment
+.env
+.env.*
+!.env.example
+.workforce_runtime.json
+
+# CLI-Injected Runtime Contexts
+.qwen_context.md
+.agy_context.md
+.agent_runtime_context.md
+
+# Runtime Logs & Memory Stores
+logs/*.log
+logs/action_logs/*.jsonl
+logs/decision_logs/*.jsonl
+logs/trace_logs/*.jsonl
+logs/cost_logs/*.jsonl
+memory_store/short_term/*.json
+memory_store/long_term/*.json
+
+# Python & Tooling Caches
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/

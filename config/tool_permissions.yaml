@@ -1,0 +1,9 @@
+tool_permissions:
+  assistant_ai: ["memory_read"]
+  manager_ai: ["memory_read", "memory_write"]
+  researcher: ["web_search", "log_reader", "rag_retrieval", "hybrid_rag"]
+  coder: ["docker_python_runner"]
+  reviewer: ["code_review"]
+  writer_tutor: ["memory_read", "memory_write"]
+  devops: ["docker_python_runner", "log_reader"]
+  security_auditor: ["code_review", "log_reader"]
