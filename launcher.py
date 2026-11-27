@@ -24,7 +24,6 @@ from harness.memory.workspace_memory import (
 from harness.workspace_guard import (
     check_git_preflight,
     load_protected_patterns,
-    make_workspace_slug,
     validate_branch_name,
 )
 

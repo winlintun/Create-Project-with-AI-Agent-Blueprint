@@ -340,8 +340,7 @@ def _apply_update_block(existing_text: str, new_block: str) -> str:
             re.DOTALL,
         )
         return pattern.sub(new_block, existing_text, count=1)
-    sep = "\n\n" if existing_text.endswith("\n") else "\n\n"
-    return existing_text.rstrip() + sep + new_block
+    return existing_text.rstrip() + "\n\n" + new_block
 
 
 def sync_agent_instruction_files(

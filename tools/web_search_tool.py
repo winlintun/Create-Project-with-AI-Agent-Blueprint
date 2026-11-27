@@ -115,23 +115,23 @@ def web_search(
             {"Accept": "application/json", "User-Agent": "PersonalAIWorkforce/10"},
             timeout_seconds,
         )
-        results: list[dict[str, str]] = []
+        ddg_results: list[dict[str, str]] = []
         if data.get("AbstractText"):
-            results.append({
+            ddg_results.append({
                 "title": str(data.get("Heading", q)),
                 "url": str(data.get("AbstractURL", "")),
                 "snippet": str(data.get("AbstractText", ""))[:300],
             })
         for topic in data.get("RelatedTopics", []):
-            if len(results) >= limit:
+            if len(ddg_results) >= limit:
                 break
             if isinstance(topic, dict) and topic.get("Text"):
-                results.append({
+                ddg_results.append({
                     "title": str(topic.get("Text", ""))[:80],
                     "url": str(topic.get("FirstURL", "")),
                     "snippet": str(topic.get("Text", ""))[:300],
                 })
-        return {"mode": "duckduckgo", "query": q, "max_results": limit, "results": results[:limit]}
+        return {"mode": "duckduckgo", "query": q, "max_results": limit, "results": ddg_results[:limit]}
     except Exception as exc:  # noqa: BLE001
         errors.append(f"duckduckgo: {type(exc).__name__}: {exc}")
 

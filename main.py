@@ -300,7 +300,7 @@ def run_bootstrap_cli(
     print(json.dumps(sync_res, ensure_ascii=False, indent=2))
 
     if install_skills:
-        print("")
+        print()
         run_recommend_skills_cli(
             workforce_root,
             workspace_root=ws_target,
