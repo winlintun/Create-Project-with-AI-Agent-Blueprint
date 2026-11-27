@@ -1,5 +1,7 @@
 # Personal AI Workforce Blueprint (v8 — Hardened Production-Grade)
 
+README: [Usage_create_personal_agent_blueprint.md](usage_create_personal_agent_blueprint.md)
+
 4-Tier AI Workforce (`CEO → Assistant AI → Manager AI → Staff AI`) with:
 - **Multi-Agent CLI Launcher** (`main.py` + `launcher.py`) for OpenCode / Claude / Qwen / Agy
 - **Dynamic YAML Tiered LLM Client** (`llm/client.py`): Anthropic Messages API, Gemini (`x-goog-api-key` header), Groq, OpenAI, Ollama, `httpx` + retry/backoff (429/5xx)

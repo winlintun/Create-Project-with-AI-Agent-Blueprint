@@ -26,3 +26,8 @@ venv/
 .mypy_cache/
 .ruff_cache/
 .pytest_cache/
+
+1.Personal-Agent-Documents.md
+2.The-Personal-AI-Workforce-Company.md
+3.Best-Practices-for-Managing-the-User-AI.md
+create_personal_agent_blueprint.py
