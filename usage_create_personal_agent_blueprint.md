@@ -18,17 +18,17 @@
 
 ---
 
-## 2. Generator Script (`create_personal_agent_blueprint.py`) အသုံးပြုပုံ
+## 2. Generator Script (`create_personal_agent_blueprint-v10.py`) အသုံးပြုပုံ
 
-`create_personal_agent_blueprint.py` သည် Project Structure (**ဖိုင် ၁၁၀ ခု**) ကို အလိုအလျောက် တည်ဆောက်ပေးပြီး ရှိပြီးသားဖိုင်များကို မတော်တဆ မဖျက်မိစေရန် ပုံမှန်အားဖြင့် **Skip (Safe-by-Default)** လုပ်ပေးပါသည်။
+`create_personal_agent_blueprint-v10.py` သည် Project Structure (**ဖိုင် ၁၁၈ ခု**) ကို အလိုအလျောက် တည်ဆောက်ပေးပြီး ရှိပြီးသားဖိုင်များကို မတော်တဆ မဖျက်မိစေရန် ပုံမှန်အားဖြင့် **Skip (Safe-by-Default)** လုပ်ပေးပါသည်။
 
 | Command | လုပ်ဆောင်ချက် (What it does) |
 | :--- | :--- |
-| `python3 create_personal_agent_blueprint.py --self-test` | Temp directory ထဲတွင် ဖိုင် ၁၁၀ ခု စမ်းသပ်ထုတ်ပြီး `compileall` နှင့် Unit Test ၁၂ အုပ်စုလုံးကို အလိုအလျောက် စစ်ဆေးပေးသည်။ |
-| `python3 create_personal_agent_blueprint.py --dry-run` | ဖိုင်အစစ် မရေးသေးဘဲ Create / Skip ဖြစ်မည့် ဖိုင်စာရင်းကို ကြိုကြည့်သည်။ |
-| `python3 create_personal_agent_blueprint.py` | လက်ရှိ folder အောက်တွင် `personal-ai-workforce/` ကို တည်ဆောက်သည်။ |
-| `python3 create_personal_agent_blueprint.py ~/Projects/personal-ai-workforce` | မိမိစိတ်ကြိုက် လမ်းကြောင်းထဲတွင် တည်ဆောက်သည်။ |
-| `python3 create_personal_agent_blueprint.py ~/Projects/personal-ai-workforce --overwrite` | ရှိပြီးသားဖိုင်များကို အစားထိုး (Overwrite) ရေးသားသည်။ (`--force` ဟုလည်း သုံးနိုင်သည်) |
+| `python3 create_personal_agent_blueprint-v10.py --self-test` | Temp directory ထဲတွင် ဖိုင် ၁၁၈ ခု စမ်းသပ်ထုတ်ပြီး `compileall` နှင့် Unit Test ၁၆ အုပ်စုလုံးကို အလိုအလျောက် စစ်ဆေးပေးသည်။ |
+| `python3 create_personal_agent_blueprint-v10.py --dry-run` | ဖိုင်အစစ် မရေးသေးဘဲ Create / Skip ဖြစ်မည့် ဖိုင်စာရင်းကို ကြိုကြည့်သည်။ |
+| `python3 create_personal_agent_blueprint-v10.py` | လက်ရှိ folder အောက်တွင် `personal-ai-workforce/` ကို တည်ဆောက်သည်။ |
+| `python3 create_personal_agent_blueprint-v10.py ~/Projects/personal-ai-workforce` | မိမိစိတ်ကြိုက် လမ်းကြောင်းထဲတွင် တည်ဆောက်သည်။ |
+| `python3 create_personal_agent_blueprint-v10.py ~/Projects/personal-ai-workforce --overwrite` | ရှိပြီးသားဖိုင်များကို အစားထိုး (Overwrite) ရေးသားသည်။ (`--force` ဟုလည်း သုံးနိုင်သည်) |
 
 ---
 

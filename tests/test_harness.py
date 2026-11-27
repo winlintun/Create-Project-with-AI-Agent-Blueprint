@@ -560,9 +560,22 @@ class TestPersonalAIWorkforceV10(unittest.TestCase):
             sync_agent_instruction_files,
         )
 
-        project_root = Path(__file__).parent.parent
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
+            wf_root = base / "workforce"
+            wf_root.mkdir()
+            (wf_root / "1.Personal-Agent-Documents.md").write_text(
+                "# Project Charter\nLifecycle: Start -> Plan -> Do & Test -> Monitor -> Close\n",
+                encoding="utf-8",
+            )
+            (wf_root / "2.The-Personal-AI-Workforce-Company.md").write_text(
+                "# 4-Tier Workforce\nCEO -> Assistant AI -> Manager AI -> Staff AI\n",
+                encoding="utf-8",
+            )
+            (wf_root / "3.Best-Practices-for-Managing-the-User-AI.md").write_text(
+                "# Harness Best Practices\nCircuit Breaker: max 2 retries\n",
+                encoding="utf-8",
+            )
 
             # Project A: Fresh Python + FastAPI + Docker project (NO agent files yet -> auto-create all 4)
             proj_a = base / "FastAPIService"
@@ -571,7 +584,7 @@ class TestPersonalAIWorkforceV10(unittest.TestCase):
             (proj_a / "requirements.txt").write_text("fastapi\npsycopg\n", encoding="utf-8")
             (proj_a / "Dockerfile").write_text("FROM python:3.12-slim\n", encoding="utf-8")
 
-            prof_a = analyze_project(project_root, proj_a)
+            prof_a = analyze_project(wf_root, proj_a)
             self.assertEqual(len(prof_a.reference_docs_found), 3)
             self.assertIn("fastapi", prof_a.detected_stack)
             self.assertIn("docker", prof_a.detected_stack)
@@ -584,7 +597,7 @@ class TestPersonalAIWorkforceV10(unittest.TestCase):
             self.assertIn("sql-optimization-patterns", skills_a)
             self.assertNotIn("vercel-react-best-practices", skills_a)
 
-            sync_a = sync_agent_instruction_files(prof_a, project_root)
+            sync_a = sync_agent_instruction_files(prof_a, wf_root)
             self.assertEqual(set(sync_a["created"]), {"AGENTS.md", "CLAUDE.md", "QWEN.md", "GEMINI.md"})
             agents_txt = (proj_a / "AGENTS.md").read_text(encoding="utf-8")
             self.assertIn("Build a fast billing API.", agents_txt)
@@ -599,7 +612,7 @@ class TestPersonalAIWorkforceV10(unittest.TestCase):
             (proj_a / "QWEN.md").write_text("# Old Qwen Rules\n", encoding="utf-8")
             answers = iter(["k", "u", "m", "k"])
             sync_a2 = sync_agent_instruction_files(
-                prof_a, project_root, input_fn=lambda _p: next(answers)
+                prof_a, wf_root, input_fn=lambda _p: next(answers)
             )
             self.assertEqual(sync_a2["kept"], ["AGENTS.md", "GEMINI.md"])
             self.assertEqual(sync_a2["updated"], ["CLAUDE.md"])
@@ -614,7 +627,7 @@ class TestPersonalAIWorkforceV10(unittest.TestCase):
             proj_b = base / "WebDashboard"
             proj_b.mkdir()
             (proj_b / "package.json").write_text('{"dependencies":{"react":"19","next":"15"}}', encoding="utf-8")
-            prof_b = analyze_project(project_root, proj_b, explicit_goal="Build React admin dashboard")
+            prof_b = analyze_project(wf_root, proj_b, explicit_goal="Build React admin dashboard")
             skills_b = {r.skill for r in decide_recommended_skills(prof_b)}
             self.assertIn("vercel-react-best-practices", skills_b)
             self.assertIn("frontend-design", skills_b)
