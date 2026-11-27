@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Personal AI Workforce v9 — Offline Demo Simulation (`demo_python_runner` isolated)."""
+"""Personal AI Workforce v10 — Offline Demo Simulation (`demo_python_runner` isolated)."""
 
 from __future__ import annotations
 
-import subprocess  # nosec B404 — demo-only, documented as not for untrusted code
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -32,7 +32,7 @@ from tools.web_search_tool import web_search
 
 def _demo_only_python_runner(python_code: str, timeout_seconds: int = 5) -> dict[str, Any]:
     """DEMO/TEST ONLY — NOT isolated. Never use for untrusted code."""
-    proc = subprocess.run(  # nosec B603 — demo-only, documented as not for untrusted code
+    proc = subprocess.run(
         [sys.executable, "-c", python_code],
         capture_output=True,
         text=True,
@@ -109,7 +109,7 @@ def run_demo_simulation(project_root: Path) -> int:
         encoding="utf-8",
     )
 
-    print("=== [DEMO SIMULATION] Personal AI Workforce v9 ===")
+    print("=== [DEMO SIMULATION] Personal AI Workforce v10 ===")
     if assistant.llm_client is not None:
         print(f"Assistant Model Tier : {assistant.llm_client.providers[0].model}")
     if manager.staff.researcher.llm_client is not None:

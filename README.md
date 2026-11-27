@@ -1,4 +1,4 @@
-# Personal AI Workforce Blueprint (v9 — Hardened Production-Grade)
+# Personal AI Workforce Blueprint (v10 — Hardened Production-Grade)
 
 4-Tier AI Workforce (`CEO → Assistant AI → Manager AI → Staff AI`) with:
 - **Multi-Agent CLI Launcher** (`main.py` + `launcher.py`) for OpenCode / Claude / Qwen / Agy

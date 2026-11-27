@@ -1,8 +1,9 @@
-"""Comprehensive Unit Tests for Personal AI Workforce v9."""
+"""Comprehensive Unit Tests for Personal AI Workforce v10."""
 
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import tempfile
 import unittest
@@ -33,7 +34,7 @@ from tools.log_reader_tool import make_log_reader_tool
 from tools.registry import ToolRegistry
 
 
-class TestPersonalAIWorkforceV9(unittest.TestCase):
+class TestPersonalAIWorkforceV10(unittest.TestCase):
     def test_anthropic_and_gemini_header_auth_without_url_key(self) -> None:
         captured: list[tuple[str, dict[str, str]]] = []
 
@@ -331,6 +332,56 @@ class TestPersonalAIWorkforceV9(unittest.TestCase):
                 validate_branch_name("--bad-flag")
             with self.assertRaises(ValueError):
                 validate_branch_name("a..b")
+
+
+    def test_pattern_b_plus_native_cli_assets_and_doctor(self) -> None:
+        from launcher import build_launch_plan, run_doctor
+
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            wf_root = base / "workforce"
+            (wf_root / "config").mkdir(parents=True)
+            (wf_root / "skills" / "create-prd").mkdir(parents=True)
+            (wf_root / "skills" / "create-prd" / "SKILL.md").write_text(
+                "---\nname: create-prd\ndescription: PRD\n---\n", encoding="utf-8"
+            )
+            (wf_root / "AGENTS.md").write_text("# WF Agents", encoding="utf-8")
+            (wf_root / "CLAUDE.md").write_text("# WF Claude", encoding="utf-8")
+            (wf_root / "config" / "language_profile.yaml").write_text("lang: my", encoding="utf-8")
+            (wf_root / "config" / "model_tiers.yaml").write_text(
+                "tier_1_orchestrators:\n  agents: [assistant_ai]\n  models:\n"
+                "    - provider: anthropic\n      model: claude-sonnet-4-5\n"
+                "tier_2_staff_executors:\n  agents: [researcher]\n  models:\n"
+                "    - provider: gemini\n      model: gemini-3.5-flash-lite\n",
+                encoding="utf-8",
+            )
+            (wf_root / "config" / "safety_policy.yaml").write_text(
+                "protected_patterns:\n  - data/**\n  - .env\n", encoding="utf-8"
+            )
+
+            existing = base / "MyApp"
+            existing.mkdir()
+
+            c_plan = build_launch_plan(
+                AGENT_PROFILES["claude"], wf_root, workspace_root=existing
+            )
+            self.assertIn("--add-dir", c_plan["argv"])
+            self.assertIn("--settings", c_plan["argv"])
+            c_dir = Path(c_plan["env"]["CLAUDE_CONFIG_DIR"])
+            self.assertTrue((c_dir / "skills" / "create-prd" / "SKILL.md").exists())
+            self.assertTrue((c_dir / "agents" / "wf-researcher.md").exists())
+            settings_data = json.loads((c_dir / "settings.json").read_text(encoding="utf-8"))
+            self.assertIn("Edit(./data/**)", settings_data["permissions"]["deny"])
+            self.assertIn("Read(./.env)", settings_data["permissions"]["deny"])
+
+            o_plan = build_launch_plan(
+                AGENT_PROFILES["opencode"], wf_root, workspace_root=existing
+            )
+            xdg = Path(o_plan["env"]["XDG_CONFIG_HOME"])
+            self.assertTrue((xdg / "opencode" / "skills" / "create-prd" / "SKILL.md").exists())
+            self.assertTrue((xdg / "opencode" / "agent" / "wf-manager.md").exists())
+
+            self.assertEqual(run_doctor(wf_root, workspace_root=existing), 0)
 
 
 if __name__ == "__main__":

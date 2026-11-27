@@ -268,7 +268,7 @@ class LLMClient:
         for spec in self.providers:
             try:
                 return self._call_provider(spec, system_prompt, user_message)
-            except Exception as exc:  # noqa: BLE001 — record error, try next provider
+            except Exception as exc:  # noqa: BLE001
                 errors.append(f"{spec.provider}({spec.model}): {type(exc).__name__}: {exc}")
         raise RuntimeError("LLM Fallback Chain failed -> " + " | ".join(errors))
 

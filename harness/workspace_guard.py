@@ -129,7 +129,7 @@ def is_protected_path(
 def check_git_preflight(workspace_root: Path) -> GitGuardStatus:
     root = workspace_root.resolve()
     warnings: list[str] = []
-    probe = subprocess.run(  # nosec B603, B607 — fixed literal git argv, no user input
+    probe = subprocess.run(  # nosec B603, B607
         ["git", "rev-parse", "--is-inside-work-tree"],
         cwd=root,
         capture_output=True,
@@ -140,7 +140,7 @@ def check_git_preflight(workspace_root: Path) -> GitGuardStatus:
         warnings.append("Workspace is not a Git repository; create a backup before editing.")
         return GitGuardStatus(False, "", False, 0, tuple(warnings))
 
-    branch_proc = subprocess.run(  # nosec B603, B607 — fixed literal git argv
+    branch_proc = subprocess.run(  # nosec B603, B607
         ["git", "branch", "--show-current"],
         cwd=root,
         capture_output=True,
@@ -153,7 +153,7 @@ def check_git_preflight(workspace_root: Path) -> GitGuardStatus:
             f"Currently on '{branch}'. Consider `--create-branch ai-workforce/<task>`."
         )
 
-    status_proc = subprocess.run(  # nosec B603, B607 — fixed literal git argv
+    status_proc = subprocess.run(  # nosec B603, B607
         ["git", "status", "--porcelain"],
         cwd=root,
         capture_output=True,

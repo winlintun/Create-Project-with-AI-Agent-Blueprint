@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Personal AI Workforce v9 — Interactive Agent CLI Launcher Entrypoint."""
+"""Personal AI Workforce v10 — Interactive Agent CLI Launcher Entrypoint."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from pathlib import Path
 
 from demo import run_demo_simulation
 from harness.env_loader import load_dotenv_file
-from launcher import AGENT_PROFILES, launch_agent, validate_agent_available
+from launcher import AGENT_PROFILES, launch_agent, run_doctor, validate_agent_available
 
 try:
     from rich.console import Console
@@ -33,7 +33,7 @@ MENU_ROWS = [
 def show_menu() -> str:
     if HAS_RICH:
         console = Console()
-        table = Table(title="Personal AI Workforce v9 — Agent CLI Launcher")
+        table = Table(title="Personal AI Workforce v10 — Agent CLI Launcher")
         table.add_column("#", style="bold cyan")
         table.add_column("Agent CLI", style="bold green")
         table.add_column("Status")
@@ -48,7 +48,7 @@ def show_menu() -> str:
         console.print(table)
         return console.input("[bold yellow]ရွေးချယ်ပါ (1-5/q): [/]").strip().lower()
 
-    print("\n=== Personal AI Workforce v9 — Agent CLI Launcher ===")
+    print("\n=== Personal AI Workforce v10 — Agent CLI Launcher ===")
     for key, slug, label, desc in MENU_ROWS:
         if slug in AGENT_PROFILES:
             status = "Installed" if validate_agent_available(AGENT_PROFILES[slug]) else "Not Found"
@@ -59,7 +59,7 @@ def show_menu() -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Personal AI Workforce v9 CLI Launcher")
+    parser = argparse.ArgumentParser(description="Personal AI Workforce v10 CLI Launcher")
     parser.add_argument("--agent", choices=list(AGENT_PROFILES.keys()))
     parser.add_argument(
         "--workspace",
@@ -74,12 +74,18 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--demo", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--doctor", action="store_true", help="Diagnose CLI asset wiring")
+    parser.add_argument(
+        "--print-launch", action="store_true", help="Print launch argv without running"
+    )
     args = parser.parse_args(argv)
 
     root = Path(__file__).parent.resolve()
     load_dotenv_file(root / ".env")
     ws_root = args.workspace.resolve() if args.workspace else None
 
+    if args.doctor:
+        return run_doctor(root, workspace_root=ws_root)
     if args.demo:
         return run_demo_simulation(root)
     if args.agent:
@@ -89,6 +95,7 @@ def main(argv: list[str] | None = None) -> int:
             workspace_root=ws_root,
             create_branch=args.create_branch,
             dry_run=args.dry_run,
+            print_launch=args.print_launch,
         )
     if os.getenv("AUTO_LAUNCH", "false").lower() == "true":
         default_agent = os.getenv("DEFAULT_AGENT", "opencode").lower()
