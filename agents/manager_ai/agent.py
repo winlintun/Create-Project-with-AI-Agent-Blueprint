@@ -16,6 +16,7 @@ from harness.circuit_breaker import (
     ValidationResult,
 )
 from harness.context_payload import StructuredContextPayload
+from harness.memory.auto_consolidation import AutoConsolidator
 from harness.memory.short_term import ShortTermMemory
 from harness.observability.tracer import ObservabilityTracer
 from harness.planner import DynamicPlanner
@@ -34,6 +35,8 @@ class ManagerAI(BaseAgent):
         tracer: ObservabilityTracer | None = None,
         llm_client: LLMClient | None = None,
         max_retries: int = 2,
+        max_concurrency: int = 4,
+        consolidator: AutoConsolidator | None = None,
     ) -> None:
         super().__init__(
             "manager_ai",
@@ -42,11 +45,34 @@ class ManagerAI(BaseAgent):
             tool_registry,
             tier=1,
             llm_client=llm_client,
+            tracer=tracer,
         )
         self.staff = staff
         self.short_term_dir = short_term_dir
         self.tracer = tracer
+        self.max_concurrency = max(1, int(max_concurrency))
+        self.consolidator = consolidator
         self.circuit_breaker = ManagerCircuitBreaker(max_retries=max_retries)
+
+    def _recall_prior_memory(self, payload: StructuredContextPayload) -> dict[str, Any]:
+        try:
+            recalled = dict(
+                self.use_tool(payload.session_id, "memory_read", keyword=payload.original_ceo_intent)
+            )
+            payload.context_notes["manager_memory_recall"] = recalled
+            return recalled
+        except (KeyError, PermissionError):
+            return {}
+
+    def _consolidate_if_enabled(
+        self, stm: ShortTermMemory, payload: StructuredContextPayload
+    ) -> int:
+        if self.consolidator is None:
+            return 0
+        self.consolidator.enqueue_session(
+            stm, topic=payload.original_ceo_intent, ceo_approved=payload.ceo_approved
+        )
+        return self.consolidator.run_once()
 
     def _run_traced(
         self, payload: StructuredContextPayload, agent: str, op: str, fn: Callable[[], T]
@@ -71,6 +97,7 @@ class ManagerAI(BaseAgent):
         payload.validate_for_handoff()
         planner = DynamicPlanner(payload.session_id, payload.approved_directive)
         stm = ShortTermMemory(payload.session_id, storage_dir=self.short_term_dir)
+        self._recall_prior_memory(payload)
 
         planner.add_step("1", "researcher", "Log များစစ်ဆေးပြီး Root Cause ရှာရန်")
         planner.add_step("2", "coder", "Fix Snippet ကို စမ်းသပ် Run ရန်")
@@ -131,6 +158,26 @@ class ManagerAI(BaseAgent):
         planner.mark_status("3", "completed", output=s3.result)
         stm.set_step_output("3", s3.result)
 
+        if self.staff.security_auditor is not None:
+            sec_auditor = self.staff.security_auditor
+            planner.add_step("4", "security_auditor", "Final Security Audit စစ်ဆေးရန်")
+            planner.mark_status("4", "in_progress")
+            s4 = self._run_traced(
+                payload,
+                "security_auditor",
+                "audit_snippet",
+                lambda: self.circuit_breaker.execute_with_gate(
+                    lambda _fb: sec_auditor.audit_snippet(payload.session_id, s2.result["code"]),
+                    lambda out: ValidationResult(
+                        bool(out.get("approved")), f"Security Issues: {out.get('issues')}"
+                    ),
+                ),
+            )
+            if not s4.success:
+                return self._escalate(planner, payload, "4", s4.escalation_reason)
+            planner.mark_status("4", "completed", output=s4.result)
+            stm.set_step_output("4", s4.result)
+
         payload.validate_for_handoff()
         self.use_tool(
             payload.session_id,
@@ -140,6 +187,7 @@ class ManagerAI(BaseAgent):
             tags=["ceo_approved"],
             ceo_approved=True,
         )
+        self._consolidate_if_enabled(stm, payload)
         return {
             "status": "COMPLETED_SIMULATION",
             "session_id": payload.session_id,
@@ -163,7 +211,8 @@ class ManagerAI(BaseAgent):
         payload.validate_for_handoff()
         planner = DynamicPlanner(payload.session_id, payload.approved_directive)
         stm = ShortTermMemory(payload.session_id, storage_dir=self.short_term_dir)
-        executor = AsyncStaffExecutor(max_concurrency=4)
+        self._recall_prior_memory(payload)
+        executor = AsyncStaffExecutor(max_concurrency=self.max_concurrency)
 
         planner.add_step("1", "researcher+devops", "Parallel log diagnostics (gated)")
         planner.add_step("2", "coder", "Draft & test fix")
@@ -259,6 +308,26 @@ class ManagerAI(BaseAgent):
         planner.mark_status("3", "completed", output=s3.result)
         stm.set_step_output("3", s3.result)
 
+        if self.staff.security_auditor is not None:
+            sec_auditor = self.staff.security_auditor
+            planner.add_step("4", "security_auditor", "Final Security Audit စစ်ဆေးရန်")
+            planner.mark_status("4", "in_progress")
+            s4 = self._run_traced(
+                payload,
+                "security_auditor",
+                "audit_snippet",
+                lambda: self.circuit_breaker.execute_with_gate(
+                    lambda _fb: sec_auditor.audit_snippet(payload.session_id, s2.result["code"]),
+                    lambda out: ValidationResult(
+                        bool(out.get("approved")), f"Security Issues: {out.get('issues')}"
+                    ),
+                ),
+            )
+            if not s4.success:
+                return self._escalate(planner, payload, "4", s4.escalation_reason)
+            planner.mark_status("4", "completed", output=s4.result)
+            stm.set_step_output("4", s4.result)
+
         payload.validate_for_handoff()
         self.use_tool(
             payload.session_id,
@@ -268,6 +337,7 @@ class ManagerAI(BaseAgent):
             tags=["ceo_approved", "async"],
             ceo_approved=True,
         )
+        self._consolidate_if_enabled(stm, payload)
         return {
             "status": "COMPLETED_ASYNC",
             "session_id": payload.session_id,

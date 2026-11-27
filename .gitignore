@@ -7,7 +7,10 @@
 # CLI-Injected Runtime Contexts
 .qwen_context.md
 .agy_context.md
+.opencode_context.md
 .agent_runtime_context.md
+claude/
+xdg/
 
 # Runtime Logs & Memory Stores
 logs/*.log
@@ -17,6 +20,7 @@ logs/trace_logs/*.jsonl
 logs/cost_logs/*.jsonl
 memory_store/short_term/*.json
 memory_store/long_term/*.json
+memory_store/long_term/*.lock
 workspaces/*
 !workspaces/.gitkeep
 
@@ -28,3 +32,9 @@ venv/
 .mypy_cache/
 .ruff_cache/
 .pytest_cache/
+1.Personal-Agent-Documents.md
+2.The-Personal-AI-Workforce-Company.md
+3.Best-Practices-for-Managing-the-User-AI.md
+AGENTS.md
+CLAUDE.md
+

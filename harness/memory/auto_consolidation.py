@@ -7,12 +7,22 @@ import threading
 from harness.memory.consolidation import consolidate_session_to_long_term
 from harness.memory.long_term import LongTermMemory
 from harness.memory.short_term import ShortTermMemory
+from harness.memory.vector_store import VectorMemoryBackend
 
 
 class AutoConsolidator:
-    def __init__(self, ltm: LongTermMemory, interval_seconds: float = 3600.0) -> None:
+    def __init__(
+        self,
+        ltm: LongTermMemory,
+        interval_seconds: float = 3600.0,
+        *,
+        vector_store: VectorMemoryBackend | None = None,
+        workspace: str | None = None,
+    ) -> None:
         self.ltm = ltm
         self.interval_seconds = interval_seconds
+        self.vector_store = vector_store
+        self.workspace = workspace
         self._queue: dict[str, tuple[ShortTermMemory, str, bool]] = {}
         self._lock = threading.Lock()
         self._stop_event = threading.Event()
@@ -30,7 +40,14 @@ class AutoConsolidator:
             self._queue.clear()
         count = 0
         for stm, topic, approved in snapshot.values():
-            consolidate_session_to_long_term(stm, self.ltm, topic=topic, ceo_approved=approved)
+            consolidate_session_to_long_term(
+                stm,
+                self.ltm,
+                topic=topic,
+                ceo_approved=approved,
+                vector_store=self.vector_store,
+                workspace=self.workspace,
+            )
             count += 1
         return count
 

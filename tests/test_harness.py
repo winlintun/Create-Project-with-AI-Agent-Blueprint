@@ -75,7 +75,7 @@ class TestPersonalAIWorkforceV10(unittest.TestCase):
         cfg_path = Path(__file__).parent.parent / "config" / "model_tiers.yaml"
         client = LLMClient.from_config(cfg_path)
         self.assertEqual(client.for_agent("assistant_ai").providers[0].provider, "anthropic")
-        self.assertEqual(client.for_agent("researcher").providers[0].model, "gemini-3.5-flash-lite")
+        self.assertEqual(client.for_agent("researcher").providers[0].model, "gemini-2.5-flash-lite")
 
         fb_client = LLMClient(
             providers=[ProviderSpec("anthropic", "claude"), ProviderSpec("ollama", "qwen2.5:7b")],
@@ -382,6 +382,241 @@ class TestPersonalAIWorkforceV10(unittest.TestCase):
             self.assertTrue((xdg / "opencode" / "agent" / "wf-manager.md").exists())
 
             self.assertEqual(run_doctor(wf_root, workspace_root=existing), 0)
+
+    def test_persistent_vector_memory_hybrid_read_and_workspace_isolation(self) -> None:
+        from api.dashboard import list_sessions, read_memory_for_dashboard
+        from harness.memory.workspace_memory import open_workspace_memory
+        from main import run_memory_read, run_memory_write
+        from tools.memory_access_tool import make_memory_read_tool, make_memory_write_tool
+
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            wf_root = base / "workforce"
+            (wf_root / "config").mkdir(parents=True)
+            (wf_root / "AGENTS.md").write_text("# WF Rules", encoding="utf-8")
+            (wf_root / "CLAUDE.md").write_text("# WF Claude", encoding="utf-8")
+            (wf_root / "config" / "language_profile.yaml").write_text("lang: my", encoding="utf-8")
+            (wf_root / "config" / "model_tiers.yaml").write_text(
+                "tier_1_orchestrators:\n  agents: [assistant_ai]\n  models:\n"
+                "    - provider: anthropic\n      model: claude-sonnet-4-5\n"
+                "tier_2_staff_executors:\n  agents: [researcher]\n  models:\n"
+                "    - provider: gemini\n      model: gemini-3.5-flash-lite\n",
+                encoding="utf-8",
+            )
+            (wf_root / "config" / "tool_permissions.yaml").write_text(
+                "tool_permissions:\n"
+                "  assistant_ai: [memory_read]\n"
+                "  manager_ai: [memory_read, memory_write]\n"
+                "  researcher: [log_reader]\n"
+                "  coder: [docker_python_runner]\n"
+                "  reviewer: [code_review]\n"
+                "  security_auditor: [code_review, log_reader]\n",
+                encoding="utf-8",
+            )
+
+            # 1. Current project memory write (requires approval) & persistent vector reload
+            self.assertEqual(run_memory_write(wf_root, "Blocked", "No approval", ceo_approved=False), 1)
+            self.assertEqual(
+                run_memory_write(
+                    wf_root, "Stripe Retry", "Added exponential backoff for Stripe checkout",
+                    tags=["stripe", "checkout"], ceo_approved=True
+                ),
+                0,
+            )
+            _ctx0, ltm0, vec0 = open_workspace_memory(wf_root)
+            self.assertGreater(vec0.count(), 0)
+            reader0 = make_memory_read_tool(ltm0, vector_store=vec0, workspace="default")
+            recent0 = reader0(keyword="")
+            self.assertEqual(len(recent0["episodes"]), 1)
+            hybrid0 = reader0(keyword="exponential backoff")
+            self.assertEqual(hybrid0["mode"], "hybrid")
+            self.assertGreaterEqual(len(hybrid0["semantic_hits"]), 1)
+
+            # 2. External --workspace memory isolation (ZERO pollution in external project!)
+            ext_proj = base / "ShopApp"
+            ext_proj.mkdir()
+            (ext_proj / "app.py").write_text("print('shop')\n", encoding="utf-8")
+            before_ext = sorted(str(p.relative_to(ext_proj)) for p in ext_proj.rglob("*"))
+
+            self.assertEqual(
+                run_memory_write(
+                    wf_root, "ShopApp Cache", "Fixed Redis TTL bug in ShopApp",
+                    tags=["redis"], ceo_approved=True, workspace_root=ext_proj
+                ),
+                0,
+            )
+            self.assertEqual(run_memory_read(wf_root, "Redis", workspace_root=ext_proj), 0)
+
+            # Verify ZERO files created inside external workspace
+            after_ext = sorted(str(p.relative_to(ext_proj)) for p in ext_proj.rglob("*"))
+            self.assertEqual(before_ext, after_ext)
+
+            # Verify external memory is isolated from default memory
+            ctx_ext, ltm_ext, vec_ext = open_workspace_memory(wf_root, ext_proj)
+            self.assertEqual(ctx_ext.workspace_slug, "ShopApp")
+            self.assertEqual(len(ltm_ext.search_episodes("Redis")), 1)
+            self.assertEqual(len(ltm_ext.search_episodes("Stripe")), 0)
+            self.assertEqual(len(vec_ext.query("Redis TTL")), 1)
+
+            # 3. Launcher injects live memory snapshot & Claude subagent uses Claude-compatible model
+            ctx_agy = prepare_context_injection(AGENT_PROFILES["agy"], wf_root, workspace_root=ext_proj)
+            agy_text = Path(ctx_agy["injected_context_path"]).read_text(encoding="utf-8")
+            self.assertIn("Persistent Memory Context", agy_text)
+            self.assertIn("ShopApp Cache", agy_text)
+
+            ctx_claude = prepare_context_injection(AGENT_PROFILES["claude"], wf_root, workspace_root=ext_proj)
+            claude_researcher = (
+                Path(ctx_claude["assets"]["config_dir"]) / "agents" / "wf-researcher.md"
+            ).read_text(encoding="utf-8")
+            self.assertIn("model: haiku", claude_researcher)
+            self.assertNotIn("gemini-3.5-flash-lite", claude_researcher)
+
+            # 4. Demo workflow on external --workspace consolidates STM -> LTM + Vector + Dashboard
+            assistant, manager, _tracer = build_demo_workforce(wf_root, workspace_root=ext_proj)
+            sample_log = ctx_ext.logs_dir / "shop.log"
+            sample_log.parent.mkdir(parents=True, exist_ok=True)
+            sample_log.write_text("ERROR 500 timeout\n", encoding="utf-8")
+            payload = assistant.draft_directive("Fix ShopApp timeout")
+            self.assertIn("memory_recall", payload.context_notes)
+            assistant.record_ceo_approval(payload, approved=True, approval_source="test")
+            res = manager.run_workflow(payload, log_path=str(sample_log))
+            self.assertEqual(res["status"], "COMPLETED_SIMULATION")
+            self.assertIn(payload.session_id, list_sessions(ctx_ext.logs_dir))
+
+            dash_mem = read_memory_for_dashboard(
+                query="ShopApp", workspace="ShopApp", project_root=wf_root
+            )
+            self.assertGreaterEqual(len(dash_mem["episodes"]), 2)
+
+            # 5. ToolRegistry.from_config loads YAML permissions
+            reg = ToolRegistry.from_config(
+                AuditLogger(wf_root / "logs"), wf_root / "config" / "tool_permissions.yaml"
+            )
+            self.assertEqual(reg.permissions["researcher"], {"log_reader"})
+            self.assertEqual(
+                make_memory_write_tool(ltm_ext, vector_store=vec_ext)(
+                    "Direct", "Saved & indexed", ceo_approved=True
+                )["indexed"],
+                True,
+            )
+
+    def test_web_search_providers_hierarchy_config_and_skills(self) -> None:
+        from harness.hierarchy_loader import load_hierarchy_config
+        from tools.web_search_tool import web_search
+
+        # 1. DuckDuckGo fallback (no API keys)
+        os.environ.pop("TAVILY_API_KEY", None)
+        os.environ.pop("BRAVE_API_KEY", None)
+        ddg = web_search(
+            "FastAPI",
+            max_results=2,
+            http_get_fn=lambda _u, _h, _t: {
+                "Heading": "FastAPI",
+                "AbstractText": "Modern Python web framework",
+                "AbstractURL": "https://fastapi.tiangolo.com",
+            },
+        )
+        self.assertEqual(ddg["mode"], "duckduckgo")
+        self.assertEqual(ddg["results"][0]["title"], "FastAPI")
+
+        # 2. Tavily API when TAVILY_API_KEY is set
+        os.environ["TAVILY_API_KEY"] = "tvly-test"
+        try:
+            tv = web_search(
+                "Python AST",
+                http_post_fn=lambda _u, _h, _p, _t: {
+                    "results": [{"title": "AST Docs", "url": "https://docs.python.org", "content": "ast module"}]
+                },
+            )
+            self.assertEqual(tv["mode"], "tavily")
+            self.assertEqual(tv["results"][0]["title"], "AST Docs")
+        finally:
+            os.environ.pop("TAVILY_API_KEY", None)
+
+        # 3. Offline graceful fallback when network fails
+        off = web_search(
+            "offline query",
+            http_get_fn=lambda _u, _h, _t: (_ for _ in ()).throw(OSError("no net")),
+        )
+        self.assertEqual(off["mode"], "offline_fallback")
+        self.assertEqual(off["results"], [])
+
+        # 4. Hierarchy config loader & enriched skills check
+        project_root = Path(__file__).parent.parent
+        hier = load_hierarchy_config(project_root / "config" / "hierarchy_config.yaml")
+        self.assertEqual(hier.max_retries_per_step, 2)
+        self.assertEqual(hier.max_concurrent_staff, 4)
+        self.assertTrue(hier.require_ceo_approval_for_memory_write)
+
+        skill_files = list((project_root / "skills").glob("*/SKILL.md"))
+        self.assertGreaterEqual(len(skill_files), 10)
+        self.assertTrue((project_root / "skills" / "memory-management" / "SKILL.md").is_file())
+        self.assertTrue((project_root / "skills" / "project-bootstrap" / "SKILL.md").is_file())
+
+    def test_project_bootstrap_agent_files_and_ai_skill_selection(self) -> None:
+        from harness.project_bootstrap import (
+            analyze_project,
+            decide_recommended_skills,
+            sync_agent_instruction_files,
+        )
+
+        project_root = Path(__file__).parent.parent
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+
+            # Project A: Fresh Python + FastAPI + Docker project (NO agent files yet -> auto-create all 4)
+            proj_a = base / "FastAPIService"
+            proj_a.mkdir()
+            (proj_a / "README.md").write_text("# FastAPIService\nBuild a fast billing API.\n", encoding="utf-8")
+            (proj_a / "requirements.txt").write_text("fastapi\npsycopg\n", encoding="utf-8")
+            (proj_a / "Dockerfile").write_text("FROM python:3.12-slim\n", encoding="utf-8")
+
+            prof_a = analyze_project(project_root, proj_a)
+            self.assertEqual(len(prof_a.reference_docs_found), 3)
+            self.assertIn("fastapi", prof_a.detected_stack)
+            self.assertIn("docker", prof_a.detected_stack)
+            self.assertIn("sql", prof_a.detected_stack)
+            self.assertEqual(len(prof_a.missing_agent_files), 4)
+
+            skills_a = {r.skill for r in decide_recommended_skills(prof_a)}
+            self.assertIn("fastapi-templates", skills_a)
+            self.assertIn("docker-expert", skills_a)
+            self.assertIn("sql-optimization-patterns", skills_a)
+            self.assertNotIn("vercel-react-best-practices", skills_a)
+
+            sync_a = sync_agent_instruction_files(prof_a, project_root)
+            self.assertEqual(set(sync_a["created"]), {"AGENTS.md", "CLAUDE.md", "QWEN.md", "GEMINI.md"})
+            agents_txt = (proj_a / "AGENTS.md").read_text(encoding="utf-8")
+            self.assertIn("Build a fast billing API.", agents_txt)
+            self.assertIn("1.Personal-Agent-Documents.md", agents_txt)
+            self.assertIn("မြန်မာစာ", agents_txt)
+
+            # Re-running when files EXIST must ask user: test Keep (k), Update (u), Modify (m), Keep (k)
+            (proj_a / "AGENTS.md").write_text("# Custom Existing Rules\n", encoding="utf-8")
+            (proj_a / "CLAUDE.md").write_text("# Existing Claude Rules\n", encoding="utf-8")
+            (proj_a / "QWEN.md").write_text("# Old Qwen Rules\n", encoding="utf-8")
+            answers = iter(["k", "u", "m", "k"])
+            sync_a2 = sync_agent_instruction_files(
+                prof_a, project_root, input_fn=lambda _p: next(answers)
+            )
+            self.assertEqual(sync_a2["kept"], ["AGENTS.md", "GEMINI.md"])
+            self.assertEqual(sync_a2["updated"], ["CLAUDE.md"])
+            self.assertEqual(sync_a2["modified"], ["QWEN.md"])
+            self.assertEqual((proj_a / "AGENTS.md").read_text(encoding="utf-8"), "# Custom Existing Rules\n")
+            claude_updated = (proj_a / "CLAUDE.md").read_text(encoding="utf-8")
+            self.assertIn("# Existing Claude Rules", claude_updated)
+            self.assertIn("WORKFORCE-MANAGED-START", claude_updated)
+            self.assertIn("FastAPIService", (proj_a / "QWEN.md").read_text(encoding="utf-8"))
+
+            # Project B: React/Next.js frontend project -> selects React & frontend-design skills
+            proj_b = base / "WebDashboard"
+            proj_b.mkdir()
+            (proj_b / "package.json").write_text('{"dependencies":{"react":"19","next":"15"}}', encoding="utf-8")
+            prof_b = analyze_project(project_root, proj_b, explicit_goal="Build React admin dashboard")
+            skills_b = {r.skill for r in decide_recommended_skills(prof_b)}
+            self.assertIn("vercel-react-best-practices", skills_b)
+            self.assertIn("frontend-design", skills_b)
+            self.assertNotIn("fastapi-templates", skills_b)
 
 
 if __name__ == "__main__":

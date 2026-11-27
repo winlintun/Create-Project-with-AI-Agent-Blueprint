@@ -17,6 +17,10 @@ from typing import Any
 
 from harness.agent_assets import render_claude_assets, render_opencode_assets
 from harness.env_loader import load_dotenv_file
+from harness.memory.workspace_memory import (
+    format_memory_snapshot_markdown,
+    resolve_workspace_memory,
+)
 from harness.workspace_guard import (
     check_git_preflight,
     load_protected_patterns,
@@ -105,7 +109,7 @@ def _build_combined_context(
         sections.append(f"\n---\n## Workforce Rule: `{rel}`\n\n{body}")
 
     if workspace_root != workforce_root:
-        for local_doc in ("AGENTS.md", "CLAUDE.md"):
+        for local_doc in ("AGENTS.md", "CLAUDE.md", "QWEN.md", "QWENS.md", "GEMINI.md"):
             lp = workspace_root / local_doc
             if lp.is_file():
                 local_body = lp.read_text(encoding="utf-8", errors="replace")
@@ -113,6 +117,9 @@ def _build_combined_context(
                     f"\n---\n## Existing Project Context: `{local_doc}` (Read-Only)\n\n"
                     f"{local_body}"
                 )
+
+    memory_md = format_memory_snapshot_markdown(workforce_root, workspace_root)
+    sections.append(f"\n---\n{memory_md}")
     return "\n".join(sections)
 
 
@@ -130,11 +137,9 @@ def prepare_context_injection(
     missing_files = [rel for rel in profile.context_files if rel not in present_files]
     protected = load_protected_patterns(wf_root / "config" / "safety_policy.yaml")
 
-    if is_external:
-        state_dir = wf_root / "workspaces" / make_workspace_slug(ws_root)
-        state_dir.mkdir(parents=True, exist_ok=True)
-    else:
-        state_dir = wf_root
+    mem_ctx = resolve_workspace_memory(wf_root, ws_root)
+    state_dir = mem_ctx.state_dir
+    state_dir.mkdir(parents=True, exist_ok=True)
 
     combined = _build_combined_context(profile, wf_root, ws_root, present_files, protected)
     assets_info: dict[str, Any] = {}
@@ -142,8 +147,7 @@ def prepare_context_injection(
     if profile.name == "claude":
         assets_info = render_claude_assets(wf_root, state_dir, protected)
         target_path = Path(assets_info["config_dir"]) / "CLAUDE.md"
-        if is_external:
-            target_path.write_text(combined, encoding="utf-8")
+        target_path.write_text(combined, encoding="utf-8")
     elif profile.name == "opencode":
         ctx_md = state_dir / ".opencode_context.md"
         ctx_md.write_text(combined, encoding="utf-8")
@@ -163,7 +167,10 @@ def prepare_context_injection(
         "agent": profile.name,
         "workforce_root": str(wf_root),
         "workspace_root": str(ws_root),
+        "workspace_slug": mem_ctx.workspace_slug,
         "state_dir": str(state_dir),
+        "memory_root": str(mem_ctx.memory_root),
+        "logs_dir": str(mem_ctx.logs_dir),
         "is_external_workspace": is_external,
         "present_files": present_files,
         "missing_files": missing_files,
@@ -205,7 +212,11 @@ def prepare_filtered_env(
     metadata_file = state_dir / ".workforce_runtime.json"
     metadata = {
         "agent": profile.name,
+        "workforce_root": ctx_info.get("workforce_root", str(project_root.resolve())),
         "workspace_root": ctx_info.get("workspace_root", str(project_root.resolve())),
+        "workspace_slug": ctx_info.get("workspace_slug", "default"),
+        "memory_root": ctx_info.get("memory_root", str(project_root.resolve() / "memory_store")),
+        "logs_dir": ctx_info.get("logs_dir", str(project_root.resolve() / "logs")),
         "context_file": ctx_info["injected_context_path"],
         "present_rules": ctx_info["present_files"],
         "assets": assets,
@@ -217,6 +228,11 @@ def prepare_filtered_env(
         pass
 
     filtered["WORKFORCE_METADATA_FILE"] = str(metadata_file)
+    filtered["WORKFORCE_ROOT"] = str(metadata["workforce_root"])
+    filtered["WORKFORCE_WORKSPACE_ROOT"] = str(metadata["workspace_root"])
+    filtered["WORKFORCE_WORKSPACE_SLUG"] = str(metadata["workspace_slug"])
+    filtered["WORKFORCE_MEMORY_DIR"] = str(metadata["memory_root"])
+    filtered["WORKFORCE_LOGS_DIR"] = str(metadata["logs_dir"])
     return filtered
 
 
@@ -263,6 +279,9 @@ def run_doctor(
 ) -> int:
     wf_root = project_root.resolve()
     ws_root = workspace_root.resolve() if workspace_root is not None else wf_root
+    if not ws_root.exists() or not ws_root.is_dir():
+        print(f"[X] Workspace directory မတွေ့ပါ: {ws_root}")
+        return 1
     expected_skills = len(list((wf_root / "skills").glob("*/SKILL.md")))
     print("=== Personal AI Workforce Doctor (Pattern B+) ===")
     print(f"Workforce Root  : {wf_root}")

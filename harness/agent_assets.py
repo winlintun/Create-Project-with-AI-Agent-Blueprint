@@ -53,7 +53,19 @@ SUBAGENT_SPECS: tuple[tuple[str, str, int, str, str], ...] = (
 )
 
 
-def _pick_tier_model(wf_root: Path, tier: int) -> str:
+def _pick_tier_model(
+    wf_root: Path, tier: int, *, provider_hint: str | None = None
+) -> str:
+    if provider_hint == "claude":
+        cfg_path = wf_root / "config" / "model_tiers.yaml"
+        if cfg_path.is_file():
+            cfg = load_tier_config(cfg_path)
+            key = "tier_1_orchestrators" if tier == 1 else "tier_2_staff_executors"
+            for m in cfg.get(key, {}).get("models", []):
+                if isinstance(m, dict) and str(m.get("provider", "")).lower() == "anthropic":
+                    return str(m.get("model", "claude-sonnet-4-5"))
+        return "claude-sonnet-4-5" if tier == 1 else "haiku"
+
     cfg_path = wf_root / "config" / "model_tiers.yaml"
     if not cfg_path.is_file():
         return "claude-sonnet-4-5" if tier == 1 else "gemini-3.5-flash-lite"
@@ -100,7 +112,11 @@ def _render_subagent_md(
 
 
 def _copy_skills_and_subagents(
-    wf_root: Path, skills_dst: Path, agents_dst: Path
+    wf_root: Path,
+    skills_dst: Path,
+    agents_dst: Path,
+    *,
+    provider_hint: str | None = None,
 ) -> tuple[int, int]:
     skills_dst.mkdir(parents=True, exist_ok=True)
     agents_dst.mkdir(parents=True, exist_ok=True)
@@ -118,8 +134,8 @@ def _copy_skills_and_subagents(
             tpl.read_text(encoding="utf-8"), encoding="utf-8"
         )
 
-    t1_model = _pick_tier_model(wf_root, 1)
-    t2_model = _pick_tier_model(wf_root, 2)
+    t1_model = _pick_tier_model(wf_root, 1, provider_hint=provider_hint)
+    t2_model = _pick_tier_model(wf_root, 2, provider_hint=provider_hint)
     agent_count = 0
     for name, desc, tier, tools, guidance in SUBAGENT_SPECS:
         model = t1_model if tier == 1 else t2_model
@@ -140,7 +156,7 @@ def render_claude_assets(
             claude_md.read_text(encoding="utf-8"), encoding="utf-8"
         )
     s_cnt, a_cnt = _copy_skills_and_subagents(
-        wf_root, home / "skills", home / "agents"
+        wf_root, home / "skills", home / "agents", provider_hint="claude"
     )
     settings_path = home / "settings.json"
     settings_obj = build_claude_settings(protected)

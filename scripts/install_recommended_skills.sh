@@ -1,23 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
-SKILLS_CLI_VERSION="${SKILLS_CLI_VERSION:-1.0.0}"
-DRY_RUN=false
-[[ "${1:-}" == "--dry-run" ]] && DRY_RUN=true
-SKILLS=(
-  "vercel-labs/skills|find-skills|Skill discovery helper"
-  "addyosmani/agent-skills|planning-and-task-breakdown|Manager AI planning helper"
-  "addyosmani/agent-skills|code-review-and-quality|Reviewer Agent quality checklist"
-  "mattpocock/skills|research|Researcher Agent workflow"
-)
-echo "=== Recommended skills.sh Packages (CLI: skills@${SKILLS_CLI_VERSION}) ==="
-for entry in "${SKILLS[@]}"; do
-  IFS="|" read -r repo skill purpose <<< "$entry"
-  echo "  - ${repo} --skill ${skill} (${purpose})"
-done
-[[ "$DRY_RUN" == "true" ]] && { echo "[DRY-RUN] No packages installed."; exit 0; }
-read -r -p "Install via npx skills@${SKILLS_CLI_VERSION}? [y/N]: " c
-[[ "$c" =~ ^[Yy]$ ]] || exit 0
-for entry in "${SKILLS[@]}"; do
-  IFS="|" read -r repo skill _ <<< "$entry"
-  npx "skills@${SKILLS_CLI_VERSION}" add "${repo}" --skill "${skill}"
-done
+
+# AI-Driven skills.sh Skill Recommender & Installer
+# Analyzes the current project (or --workspace <path>) + 3 Workforce Reference Docs,
+# decides which skills.sh packages are needed, and installs them with user confirmation.
+#
+# Usage:
+#   bash scripts/install_recommended_skills.sh --dry-run
+#   bash scripts/install_recommended_skills.sh --workspace /path/to/MyApp --goal "FastAPI app"
+#   bash scripts/install_recommended_skills.sh --yes
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WORKFORCE_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+exec python3 "${WORKFORCE_ROOT}/main.py" --recommend-skills "$@"

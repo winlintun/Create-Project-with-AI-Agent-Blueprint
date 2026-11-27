@@ -44,6 +44,12 @@ class AssistantAI(BaseAgent):
             approved_directive=f"Investigate '{raw_ceo_intent}'",
             constraints=constraints,
         )
+        try:
+            recalled = self.use_tool(payload.session_id, "memory_read", keyword=raw_ceo_intent)
+            payload.context_notes["memory_recall"] = recalled
+        except (KeyError, PermissionError):
+            pass
+
         if self.llm_client is not None:
             resp = self.ask_llm(
                 f"Refine CEO intent: {raw_ceo_intent}",
