@@ -320,7 +320,12 @@ def render_agent_instruction_markdown(
         f"`migrations/**`, `*.db`, `*.sqlite*`, `*.sql`, `.env*`.\n"
         f"- **Persistent Memory CLI:**\n"
         f"  - Read: `python3 main.py --memory-read \"<query>\"`{ws_flag}\n"
-        f"  - Save (CEO approved): `python3 main.py --memory-write \"<topic>\" \"<summary>\" --approve`{ws_flag}\n"
+        f"  - Save (CEO approved): `python3 main.py --memory-write \"<topic>\" \"<summary>\" --approve`{ws_flag}\n\n"
+        f"## 4. Autonomous Goal Completion & Mandatory Testing (目標導向自動完成與強制測試)\n"
+        f"- **Complete End-to-End Delivery:** Once CEO approves the goal/plan, autonomously build all required files, modules, and features to fulfill the user's goal completely — never stop at half-finished stubs or unimplemented `TODO` placeholders.\n"
+        f"- **Mandatory Automated Testing (`強制自動化測試`):** Before reporting completion, write and run automated tests (unit/integration/smoke tests) verifying every core requirement of the user's goal.\n"
+        f"- **Verify & Self-Fix Loop:** If any test, lint, or runtime check fails, inspect the error, fix the root cause, and re-run tests until 100% green (up to Circuit Breaker limit; escalate to CEO only if truly blocked).\n"
+        f"- **Definition of Done (`完成定義`):** A task is ONLY complete when (1) the user's goal works end-to-end, (2) all tests pass with verifiable output, and (3) docs/configs are updated cleanly.\n"
     )
     if is_update_block:
         return f"{MANAGED_BLOCK_START}\n{body.strip()}\n{MANAGED_BLOCK_END}\n"

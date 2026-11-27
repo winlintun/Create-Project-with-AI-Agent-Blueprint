@@ -32,9 +32,13 @@ venv/
 .mypy_cache/
 .ruff_cache/
 .pytest_cache/
+.coverage
+htmlcov/
+node_modules/
+.DS_Store
+
+# Personal Reference Docs (Local Only)
 1.Personal-Agent-Documents.md
 2.The-Personal-AI-Workforce-Company.md
 3.Best-Practices-for-Managing-the-User-AI.md
-AGENTS.md
-CLAUDE.md
 

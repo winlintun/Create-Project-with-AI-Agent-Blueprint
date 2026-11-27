@@ -1,14 +1,16 @@
-# Personal AI Workforce Blueprint (v9) — အသုံးပြုပုံ လမ်းညွှန် (Usage README)
+# Personal AI Workforce Blueprint (v10) — အသုံးပြုပုံ လမ်းညွှန် (Usage README)
 
-ဤ README သည် `create_personal_agent_blueprint.py` Generator Script နှင့် ၎င်းမှ ထုတ်ပေးသော **Personal AI Workforce (v9 — Pattern B Zero-Pollution Workspace Mode)** ကို စတင်တည်ဆောက်ခြင်း၊ ရှိပြီးသား ပရောဂျက်များ (`IncomeTrackerv1`, `Novel-v1` စသည်) နှင့် Data/Code မထိခိုက်ဘဲ ချိတ်ဆက် Run ခြင်းတို့အတွက် အဆင့်ဆင့် လမ်းညွှန်ဖြစ်ပါသည်။
+ဤ README သည် `create_personal_agent_blueprint-v10.py` Generator Script နှင့် ၎င်းမှ ထုတ်ပေးသော **Personal AI Workforce (v10 — Pattern B+ Native CLI Assets & Zero-Pollution Workspace Mode)** ကို စတင်တည်ဆောက်ခြင်း၊ ရှိပြီးသား ပရောဂျက်များ (`IncomeTrackerv1`, `Novel-v1` စသည်) နှင့် Data/Code မထိခိုက်ဘဲ ချိတ်ဆက် Run ခြင်းတို့အတွက် အဆင့်ဆင့် လမ်းညွှန်ဖြစ်ပါသည်။
 
 ---
 
 ## 1. လိုအပ်ချက်များ (Prerequisites)
 
-- **Python 3.11+** (Generator script, CLI Launcher, Demo နှင့် Unit Tests ၁၂ အုပ်စုလုံးသည် Python Standard Library သီးသန့်ဖြင့် Run နိုင်ပါသည်)
-- **Optional Python Packages** (Rich CLI Table, PyYAML, `httpx`, FastAPI/Uvicorn Dashboard အတွက်):
+- **Python 3.11+** (CLI Launcher, Demo နှင့် Unit Tests **၁၆ အုပ်စု**လုံးသည် Python Standard Library သီးသန့်ဖြင့် Run နိုင်ပါသည်)
+- **Virtual Environment (`.venv`) နှင့် Python Packages** (Rich CLI Table, PyYAML, `httpx`, FastAPI/Uvicorn Dashboard အတွက်):
   ```bash
+  python3 -m venv .venv
+  source .venv/bin/activate
   pip install -r requirements.txt
   ```
 - **Docker** (Production တွင် `docker_python_runner` ဖြင့် ဘေးကင်းစွာ Code Run ရန် — 沙盒隔離 / Sandbox Isolation)
@@ -42,7 +44,7 @@ cp .env.example .env
 ### အဓိက Config ဖိုင် ၃ ခု (Runtime Dynamic Load)
 - **`config/model_tiers.yaml`** (分層預算模型 / Tiered Budget Routing):
   - **Tier 1 (`assistant_ai`, `manager_ai`):** Premium Reasoning Models (`claude-sonnet-4-5`, `gemini-2.5-pro`)
-  - **Tier 2 (`researcher`, `coder`, `reviewer`, `writer_tutor`, `devops`, `security_auditor`):** Budget Models (`gemini-3.5-flash-lite`, Groq `llama-3.3-70b-versatile`, Local Ollama `qwen2.5:7b`)
+  - **Tier 2 (`researcher`, `coder`, `reviewer`, `writer_tutor`, `devops`, `security_auditor`):** Budget Models (`gemini-2.5-flash-lite`, Groq `llama-3.3-70b-versatile`, Local Ollama `qwen2.5:7b`)
   - Anthropic (`x-api-key`) နှင့် Gemini (`x-goog-api-key` header) တို့ကို Fallback Chain (`備援鏈`) နှင့် HTTP 429/5xx `Retry-After` backoff ဖြင့် ချိတ်ဆက်ထားသည်။
 - **`config/safety_policy.yaml`** (Protected Data Paths):
   - `data/**`, `backups/**`, `migrations/**`, `*.db`, `*.sqlite*`, `*.sql`, `.env`, `.env.*` တို့ကို recursive `**` glob ဖြင့် runtime တွင် အလိုအလျောက် ကာကွယ်ပေးသည်။
@@ -107,19 +109,45 @@ uvicorn api.dashboard:app --host 127.0.0.1 --port 8080 --reload
 | Endpoint | ဖော်ပြချက် |
 | :--- | :--- |
 | `GET /dashboard` | Dashboard ပင်မစာမျက်နှာ |
-| `GET /api/traces?session_id=<id>` | Session အလိုက် Trace spans များ |
-| `GET /api/costs?session_id=<id>` | Session အလိုက် LLM call cost မှတ်တမ်းများ |
-| `GET /api/costs/summary?session_id=<id>` | စုစုပေါင်း Input/Output Tokens နှင့် Estimated Cost (USD) |
+| `GET /api/sessions?workspace=<slug>` | Workspace အလိုက် Session စာရင်းများ |
+| `GET /api/memory?workspace=<slug>&q=<query>` | Persistent Long-Term & Vector Memory ရှာဖွေခြင်း |
+| `GET /api/traces?session_id=<id>&workspace=<slug>` | Session အလိုက် Trace spans များ |
+| `GET /api/costs?session_id=<id>&workspace=<slug>` | Session အလိုက် LLM call cost မှတ်တမ်းများ |
+| `GET /api/costs/summary?session_id=<id>&workspace=<slug>` | စုစုပေါင်း Input/Output Tokens နှင့် Estimated Cost (USD) |
 
 `.env` တွင် `WORKFORCE_DASHBOARD_TOKEN` ထည့်ထားပါက Request Header တွင် `Authorization: Bearer <token>` ထည့်ပေးရပါမည်။
 
 ---
 
-## 7. စစ်ဆေးခြင်း နှင့် CI Checks (Testing & Quality)
+## 7. v10 CLI အသစ်များ (`--doctor`, Memory, `--run`, `--bootstrap`, `--recommend-skills`)
 
 ```bash
-# 1. Unit Tests ၁၂ အုပ်စုလုံး Run ရန် (Zero external dependencies)
-python3 -m unittest discover -s tests -v
+# 1. CLI Asset Wiring & Native Skills စစ်ဆေးရန် (Pattern B+)
+python3 main.py --doctor
+
+# 2. Persistent Memory ဖတ်ရန် / CEO Approval ဖြင့် သိမ်းရန် (JSON + Vector Store)
+python3 main.py --memory-read ""
+python3 main.py --memory-read "Stripe timeout"
+python3 main.py --memory-write "Stripe Retry" "Added exponential backoff" --tags "stripe,api" --approve
+
+# 3. Production 4-Tier Workflow (Real LLM + Docker Sandbox)
+python3 main.py --run "Fix the checkout bug."
+
+# 4. Project Bootstrap (AGENTS.md, CLAUDE.md, QWEN.md, GEMINI.md Sync)
+python3 main.py --bootstrap --dry-run
+
+# 5. AI Skill Decision Engine (skills.sh via npx -y skills@latest)
+python3 main.py --recommend-skills --dry-run
+python3 main.py --recommend-skills --yes
+```
+
+---
+
+## 8. စစ်ဆေးခြင်း နှင့် CI Checks (Testing & Quality)
+
+```bash
+# 1. Unit Tests ၁၆ အုပ်စုလုံး Run ရန် (Zero external dependencies)
+.venv/bin/python -m unittest discover -s tests -v
 
 # 2. Docker Sandbox Isolation စမ်းသပ်ရန်
 bash tests/integration/docker_sandbox_test.sh
@@ -132,7 +160,7 @@ bandit -r agents/ api/ harness/ llm/ tools/ launcher.py
 
 ---
 
-## 8. Community Skills ထပ်ထည့်ခြင်း (`skills.sh`)
+## 9. Community Skills ထပ်ထည့်ခြင်း (`skills.sh`)
 
 ```bash
 bash scripts/install_recommended_skills.sh --dry-run
@@ -141,7 +169,7 @@ bash scripts/install_recommended_skills.sh
 
 ---
 
-## 9. လုံခြုံရေး အနှစ်ချုပ် (Security Highlights)
+## 10. လုံခြုံရေး အနှစ်ချုပ် (Security Highlights)
 
 - **Gatekeeper & SHA-256 Tamper Check:** CEO Approve ပြီးနောက် Directive/Constraints ပြောင်းသွားပါက Approval အလိုအလျောက် ပျက်ပြယ်သည်။
 - **Docker Hardening:** `--network=none`, `--read-only`, `--cap-drop=ALL`, `--tmpfs /tmp:size=16m,noexec,nosuid,nodev`, `--pids-limit=64`, optional `--cap-add` allowlist နှင့် timeout ကျလျှင် `docker kill` လုပ်ပေးသည်။
@@ -150,9 +178,9 @@ bash scripts/install_recommended_skills.sh
 
 ---
 
-## 10. CI Quality Rules — နောက်ထပ် မပြုလုပ်ရန် သတိပေးချက်များ
+## 11. CI Quality Rules — နောက်ထပ် မပြုလုပ်ရန် သတိပေးချက်များ
 
-Blueprint v9 မှ generate လုပ်သည့် project အားလုံးသည် CI (ruff → mypy → bandit → unittest → docker) အဆင့် ၅ ဆင့်လုံး တန်းအတွက် အစိမ်းရောင် ဖြစ်ရန် အောက်ပါ စည်းမျဉ်းများကို template ထဲမှာ ကြိုပြီး ကာကွယ်ထားပြီးဖြစ်သည် —
+Blueprint v10 မှ generate လုပ်သည့် project အားလုံးသည် CI (ruff → mypy → bandit → unittest → docker) အဆင့် ၅ ဆင့်လုံး တန်းအတွက် အစိမ်းရောင် ဖြစ်ရန် အောက်ပါ စည်းမျဉ်းများကို template ထဲမှာ ကြိုပြီး ကာကွယ်ထားပြီးဖြစ်သည် —
 
 1. **`# type: ignore` comment မထည့်ရ:** `pyproject.toml` တွင် `ignore_missing_imports = true` ရှိသဖြင့် missing import များ အလိုအလျောက် ဖြေရှင်းပြီးဖြစ်သည်။ ထည့်ပါက `warn_unused_ignores = true` က mypy error ပြန်ထုတ်သည်။
 2. **`list` များကို ကြို annotate လုပ်ရန်:** `sort()` မတိုင်မီ `scored: list[dict[str, Any]] = []` ကြိုရေးပြီး sort key တွင် `float(x["score"])` သုံးရန် — မဟုတ်ပါက mypy `arg-type` error ထုတ်သည်။

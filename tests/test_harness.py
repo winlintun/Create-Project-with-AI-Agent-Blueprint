@@ -590,6 +590,8 @@ class TestPersonalAIWorkforceV10(unittest.TestCase):
             self.assertIn("Build a fast billing API.", agents_txt)
             self.assertIn("1.Personal-Agent-Documents.md", agents_txt)
             self.assertIn("မြန်မာစာ", agents_txt)
+            self.assertIn("Autonomous Goal Completion & Mandatory Testing", agents_txt)
+            self.assertIn("Definition of Done", agents_txt)
 
             # Re-running when files EXIST must ask user: test Keep (k), Update (u), Modify (m), Keep (k)
             (proj_a / "AGENTS.md").write_text("# Custom Existing Rules\n", encoding="utf-8")
