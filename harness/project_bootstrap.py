@@ -405,15 +405,16 @@ def sync_agent_instruction_files(
 def install_selected_skills(
     recommendations: list[SkillRecommendation],
     *,
-    skills_cli_version: str = "1.0.0",
+    skills_cli_version: str = "latest",
     dry_run: bool = False,
     auto_yes: bool = False,
     input_fn: Callable[[str], str] = input,
     cwd: Path | None = None,
 ) -> dict[str, Any]:
-    """Install AI-selected skills from skills.sh via `npx skills@<ver> add`."""
+    """Install AI-selected skills from skills.sh via `npx -y skills@latest add`."""
+    pkg = f"skills@{skills_cli_version}" if skills_cli_version else "skills"
     commands = [
-        ["npx", f"skills@{skills_cli_version}", "add", rec.repo, "--skill", rec.skill]
+        ["npx", "-y", pkg, "add", rec.repo, "--skill", rec.skill]
         for rec in recommendations
     ]
     if dry_run:
@@ -421,7 +422,7 @@ def install_selected_skills(
 
     if not auto_yes:
         ans = input_fn(
-            f"Install {len(recommendations)} AI-selected skills via npx skills@{skills_cli_version}? [y/N]: "
+            f"Install {len(recommendations)} AI-selected skills via npx {pkg}? [y/N]: "
         ).strip().lower()
         if ans not in {"y", "yes"}:
             return {"installed": [], "cancelled": True, "commands": commands}

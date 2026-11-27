@@ -232,7 +232,7 @@ def run_recommend_skills_cli(
 ) -> int:
     profile = analyze_project(workforce_root, workspace_root, explicit_goal=goal)
     recs = decide_recommended_skills(profile, extra_goal_text=goal or "")
-    cli_ver = os.getenv("SKILLS_CLI_VERSION", "1.0.0")
+    cli_ver = os.getenv("SKILLS_CLI_VERSION", "latest")
     print(f"=== AI Skill Decision Engine (skills.sh | CLI: skills@{cli_ver}) ===")
     print(f"Target Project : {profile.project_name} ({profile.workspace_root})")
     print(f"Detected Stack : {', '.join(profile.detected_stack) or 'general'}")
@@ -255,6 +255,9 @@ def run_recommend_skills_cli(
         print("\n[!] Skill installation cancelled by user.")
     else:
         print(f"\n[OK] Installed {len(res.get('installed', []))} skill(s).")
+        if res.get("failed"):
+            print(f"[!] Failed ({len(res['failed'])}): {res['failed']}")
+            return 1
     return 0
 
 
