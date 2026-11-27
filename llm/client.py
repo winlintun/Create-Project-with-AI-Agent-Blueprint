@@ -19,14 +19,14 @@ from pathlib import Path
 from typing import Any
 
 try:
-    import yaml  # type: ignore[import-untyped]
+    import yaml
 
     HAS_YAML = True
 except ImportError:
     HAS_YAML = False
 
 try:
-    import httpx  # type: ignore[import-not-found]
+    import httpx
 
     HAS_HTTPX = True
 except ImportError:
@@ -169,7 +169,7 @@ def _post_json_with_retry(
                     return dict(resp.json())
             raw = json.dumps(payload).encode("utf-8")
             req = urllib.request.Request(url, data=raw, headers=headers, method="POST")
-            with urllib.request.urlopen(req, timeout=timeout_seconds) as uresp:
+            with urllib.request.urlopen(req, timeout=timeout_seconds) as uresp:  # nosec B310
                 return dict(json.loads(uresp.read().decode("utf-8")))
         except urllib.error.HTTPError as exc:
             last_err = exc

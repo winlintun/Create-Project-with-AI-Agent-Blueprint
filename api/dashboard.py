@@ -64,8 +64,8 @@ def verify_dashboard_token(auth_header: str | None) -> bool:
 
 app: Any = None
 try:
-    from fastapi import FastAPI, Header, HTTPException  # type: ignore[import-not-found]
-    from fastapi.responses import HTMLResponse  # type: ignore[import-not-found]
+    from fastapi import FastAPI, Header, HTTPException
+    from fastapi.responses import HTMLResponse
 
     app = FastAPI(title="Personal AI Workforce Observability Dashboard")
 
@@ -121,6 +121,6 @@ except ImportError:
 
 
 if __name__ == "__main__":
-    import uvicorn  # type: ignore[import-not-found]
+    import uvicorn
 
     uvicorn.run(app, host="127.0.0.1", port=8080)

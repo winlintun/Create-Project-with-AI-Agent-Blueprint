@@ -38,7 +38,10 @@ def make_hybrid_rag_tool(
         safe_dir = ensure_path_within_root(candidate, root)
         if not safe_dir.exists() or not safe_dir.is_dir():
             return {"query": query, "results": [], "error": "Directory not found."}
-        q_vec, q_low, scored, scanned = _tokenize(query), query.lower(), [], 0
+        q_vec = _tokenize(query)
+        q_low = query.lower()
+        scored: list[dict[str, Any]] = []
+        scanned = 0
         for fp in sorted(safe_dir.rglob("*.md")):
             if scanned >= max_files or fp.is_symlink():
                 continue
@@ -61,7 +64,7 @@ def make_hybrid_rag_tool(
                     "keyword_match": kw > 0,
                     "preview": text[:200],
                 })
-        scored.sort(key=lambda x: x["score"], reverse=True)
+        scored.sort(key=lambda x: float(x["score"]), reverse=True)
         return {
             "query": query,
             "mode": "hybrid_keyword_cosine",

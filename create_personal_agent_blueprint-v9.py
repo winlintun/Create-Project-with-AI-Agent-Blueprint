@@ -66,7 +66,11 @@ def write_file(
     status = "overwritten" if exists else "created"
     if not dry_run:
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(content.lstrip("\n"), encoding="utf-8")
+        body = content.lstrip("\n")
+        target.write_text(body, encoding="utf-8")
+        # Shebang files (entry points / scripts) must carry the executable bit (ruff EXE001)
+        if body.startswith("#!"):
+            target.chmod(0o755)
 
     if report is not None:
         if status == "overwritten":
@@ -358,15 +362,15 @@ from __future__ import annotations
 import json
 import os
 import shutil
-import subprocess
+import subprocess  # nosec B404 — only runs whitelisted CLI commands from AGENT_PROFILES
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from harness.env_loader import load_dotenv_file
 from harness.workspace_guard import (
-    load_protected_patterns,
     check_git_preflight,
+    load_protected_patterns,
     make_workspace_slug,
     validate_branch_name,
 )
@@ -589,7 +593,7 @@ def launch_agent(
     if create_branch:
         safe_branch = validate_branch_name(create_branch)
         if not dry_run and git_status.is_git_repo:
-            subprocess.run(
+            subprocess.run(  # nosec B603, B607 — fixed literal git argv, validated branch name
                 ["git", "checkout", "-b", safe_branch], cwd=ws_root, check=False
             )
 
@@ -614,7 +618,7 @@ def launch_agent(
         return 0
 
     try:
-        proc = subprocess.run(list(profile.command), cwd=ws_root, env=env, check=False)
+        proc = subprocess.run(list(profile.command), cwd=ws_root, env=env, check=False)  # nosec B603
         return proc.returncode
     except KeyboardInterrupt:
         print("\\n[!] User interrupted. Exiting gracefully.")
@@ -753,7 +757,7 @@ if __name__ == "__main__":
 
 from __future__ import annotations
 
-import subprocess
+import subprocess  # nosec B404 — demo-only, documented as not for untrusted code
 import sys
 from pathlib import Path
 from typing import Any
@@ -782,7 +786,7 @@ from tools.web_search_tool import web_search
 
 def _demo_only_python_runner(python_code: str, timeout_seconds: int = 5) -> dict[str, Any]:
     \"\"\"DEMO/TEST ONLY — NOT isolated. Never use for untrusted code.\"\"\"
-    proc = subprocess.run(
+    proc = subprocess.run(  # nosec B603 — demo-only, documented as not for untrusted code
         [sys.executable, "-c", python_code],
         capture_output=True,
         text=True,
@@ -904,20 +908,20 @@ import os
 import time
 import urllib.error
 import urllib.request
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from collections.abc import Callable
 from typing import Any
 
 try:
-    import yaml  # type: ignore[import-untyped]
+    import yaml
 
     HAS_YAML = True
 except ImportError:
     HAS_YAML = False
 
 try:
-    import httpx  # type: ignore[import-not-found]
+    import httpx
 
     HAS_HTTPX = True
 except ImportError:
@@ -1060,7 +1064,7 @@ def _post_json_with_retry(
                     return dict(resp.json())
             raw = json.dumps(payload).encode("utf-8")
             req = urllib.request.Request(url, data=raw, headers=headers, method="POST")
-            with urllib.request.urlopen(req, timeout=timeout_seconds) as uresp:
+            with urllib.request.urlopen(req, timeout=timeout_seconds) as uresp:  # nosec B310
                 return dict(json.loads(uresp.read().decode("utf-8")))
         except urllib.error.HTTPError as exc:
             last_err = exc
@@ -1159,7 +1163,7 @@ class LLMClient:
         for spec in self.providers:
             try:
                 return self._call_provider(spec, system_prompt, user_message)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 — record error, try next provider
                 errors.append(f"{spec.provider}({spec.model}): {type(exc).__name__}: {exc}")
         raise RuntimeError("LLM Fallback Chain failed -> " + " | ".join(errors))
 
@@ -1178,7 +1182,7 @@ class LLMClient:
         if spec.provider == "anthropic":
             api_key = os.getenv(spec.api_key_env or "ANTHROPIC_API_KEY", "")
             if not api_key:
-                raise EnvironmentError("Missing ANTHROPIC_API_KEY")
+                raise OSError("Missing ANTHROPIC_API_KEY")
             data = self._http_post(
                 "https://api.anthropic.com/v1/messages",
                 headers={
@@ -1205,7 +1209,7 @@ class LLMClient:
         if spec.provider == "gemini":
             api_key = os.getenv(spec.api_key_env or "GEMINI_API_KEY", "")
             if not api_key:
-                raise EnvironmentError("Missing GEMINI_API_KEY")
+                raise OSError("Missing GEMINI_API_KEY")
             url = (
                 f"https://generativelanguage.googleapis.com/v1beta/models/"
                 f"{spec.model}:generateContent"
@@ -1233,7 +1237,7 @@ class LLMClient:
             )
             api_key = os.getenv(env_key, "")
             if not api_key:
-                raise EnvironmentError(f"Missing {env_key}")
+                raise OSError(f"Missing {env_key}")
             url = (
                 "https://api.groq.com/openai/v1/chat/completions"
                 if spec.provider == "groq"
@@ -1330,12 +1334,12 @@ from __future__ import annotations
 
 import fnmatch
 import re
-import subprocess
+import subprocess  # nosec B404 — runs fixed, hardcoded git subcommands only
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
 try:
-    import yaml  # type: ignore[import-untyped]
+    import yaml
 
     HAS_YAML = True
 except ImportError:
@@ -1450,7 +1454,7 @@ def is_protected_path(
 def check_git_preflight(workspace_root: Path) -> GitGuardStatus:
     root = workspace_root.resolve()
     warnings: list[str] = []
-    probe = subprocess.run(
+    probe = subprocess.run(  # nosec B603, B607 — fixed literal git argv, no user input
         ["git", "rev-parse", "--is-inside-work-tree"],
         cwd=root,
         capture_output=True,
@@ -1461,7 +1465,7 @@ def check_git_preflight(workspace_root: Path) -> GitGuardStatus:
         warnings.append("Workspace is not a Git repository; create a backup before editing.")
         return GitGuardStatus(False, "", False, 0, tuple(warnings))
 
-    branch_proc = subprocess.run(
+    branch_proc = subprocess.run(  # nosec B603, B607 — fixed literal git argv
         ["git", "branch", "--show-current"],
         cwd=root,
         capture_output=True,
@@ -1474,7 +1478,7 @@ def check_git_preflight(workspace_root: Path) -> GitGuardStatus:
             f"Currently on '{branch}'. Consider `--create-branch ai-workforce/<task>`."
         )
 
-    status_proc = subprocess.run(
+    status_proc = subprocess.run(  # nosec B603, B607 — fixed literal git argv
         ["git", "status", "--porcelain"],
         cwd=root,
         capture_output=True,
@@ -1529,7 +1533,7 @@ import hashlib
 import json
 import uuid
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from harness.validators import validate_session_id
@@ -1572,7 +1576,7 @@ class StructuredContextPayload:
         if extra_constraints:
             self.constraints.extend(extra_constraints)
         self.ceo_approved = True
-        self.approved_at = datetime.now(timezone.utc).isoformat()
+        self.approved_at = datetime.now(UTC).isoformat()
         self.approval_source = approval_source
         self.approval_digest = self._compute_digest()
 
@@ -1599,8 +1603,8 @@ class StructuredContextPayload:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 
@@ -1636,7 +1640,7 @@ class ManagerCircuitBreaker:
             try:
                 output = task_fn(feedback)
                 check = validator_fn(output)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 — any crash becomes retry feedback
                 feedback = f"Unhandled exception ({type(exc).__name__}): {exc}"
                 continue
             if check.passed:
@@ -1734,8 +1738,8 @@ class AsyncStaffExecutor:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from collections.abc import Callable
+from dataclasses import dataclass
 
 from harness.context_payload import StructuredContextPayload
 
@@ -1774,10 +1778,10 @@ from __future__ import annotations
 import json
 import os
 import time
-from contextlib import contextmanager
-from datetime import datetime, timezone
-from pathlib import Path
 from collections.abc import Iterator
+from contextlib import contextmanager
+from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from harness.validators import ensure_path_within_root, validate_session_id
@@ -1817,7 +1821,7 @@ class ObservabilityTracer:
                 self.trace_dir,
                 session_id,
                 {
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "timestamp": datetime.now(UTC).isoformat(),
                     "trace_id": trace_id,
                     "session_id": session_id,
                     "agent": agent,
@@ -1840,7 +1844,7 @@ class ObservabilityTracer:
         estimated_cost_usd: float,
     ) -> dict[str, Any]:
         entry = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "trace_id": trace_id,
             "session_id": session_id,
             "agent": agent,
@@ -1893,7 +1897,7 @@ class ShortTermMemory:
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -1925,7 +1929,7 @@ class LongTermMemory:
         data = self._load_raw()
         data.setdefault("episodes", []).append(
             {
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "topic": topic,
                 "summary": summary,
                 "tags": tags or [],
@@ -2056,7 +2060,7 @@ class AutoConsolidator:
             snapshot = dict(self._queue)
             self._queue.clear()
         count = 0
-        for _sid, (stm, topic, approved) in snapshot.items():
+        for (stm, topic, approved) in snapshot.values():
             consolidate_session_to_long_term(stm, self.ltm, topic=topic, ceo_approved=approved)
             count += 1
         return count
@@ -2086,7 +2090,7 @@ from __future__ import annotations
 import json
 import os
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -2141,7 +2145,7 @@ class AuditLogger:
     ) -> dict[str, Any]:
         safe_id = validate_session_id(session_id)
         entry = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "session_id": safe_id,
             "agent": agent_name,
             "tool": tool_name,
@@ -2156,7 +2160,7 @@ class AuditLogger:
     ) -> dict[str, Any]:
         safe_id = validate_session_id(session_id)
         entry = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "session_id": safe_id,
             "actor": actor,
             "decision": decision,
@@ -2191,7 +2195,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from harness.validators import ensure_path_within_root, validate_session_id  # noqa: E402
+from harness.validators import ensure_path_within_root, validate_session_id
 
 LOGS_ROOT = PROJECT_ROOT / "logs"
 
@@ -2242,8 +2246,8 @@ def verify_dashboard_token(auth_header: str | None) -> bool:
 
 app: Any = None
 try:
-    from fastapi import FastAPI, Header, HTTPException  # type: ignore[import-not-found]
-    from fastapi.responses import HTMLResponse  # type: ignore[import-not-found]
+    from fastapi import FastAPI, Header, HTTPException
+    from fastapi.responses import HTMLResponse
 
     app = FastAPI(title="Personal AI Workforce Observability Dashboard")
 
@@ -2299,7 +2303,7 @@ except ImportError:
 
 
 if __name__ == "__main__":
-    import uvicorn  # type: ignore[import-not-found]
+    import uvicorn
 
     uvicorn.run(app, host="127.0.0.1", port=8080)
 """
@@ -2392,10 +2396,9 @@ from __future__ import annotations
 
 import os
 import shutil
-import subprocess
+import subprocess  # nosec B404 — runs fixed docker CLI argv only
 import uuid
 from typing import Any
-
 
 ALLOWED_DOCKER_CAPS = frozenset({"NET_BIND_SERVICE"})
 
@@ -2418,7 +2421,7 @@ def build_docker_sandbox_cmd(
         "--network=none",
         "--read-only",
         "--cap-drop=ALL",
-        "--tmpfs", "/tmp:size=16m,noexec,nosuid,nodev",
+        "--tmpfs", "/tmp:size=16m,noexec,nosuid,nodev",  # nosec B108 — container-internal tmpfs
         f"--memory={memory}",
         f"--cpus={cpus}",
         f"--pids-limit={pids_limit}",
@@ -2454,7 +2457,7 @@ def docker_python_runner(
 
     cname, cmd = build_docker_sandbox_cmd(python_code, image=image, runtime=runtime)
     try:
-        proc = subprocess.run(
+        proc = subprocess.run(  # nosec B603 — argv built internally, no shell
             cmd, capture_output=True, text=True, timeout=timeout_seconds, check=False
         )
         return {
@@ -2468,8 +2471,8 @@ def docker_python_runner(
         }
     except subprocess.TimeoutExpired:
         # Actively kill the container so it does not keep running after CLI timeout
-        subprocess.run(["docker", "kill", cname], capture_output=True, text=True, check=False)
-        subprocess.run(["docker", "rm", "-f", cname], capture_output=True, text=True, check=False)
+        subprocess.run(["docker", "kill", cname], capture_output=True, text=True, check=False)  # nosec B603, B607
+        subprocess.run(["docker", "rm", "-f", cname], capture_output=True, text=True, check=False)  # nosec B603, B607
         return {
             "isolated": True,
             "available": True,
@@ -2572,8 +2575,8 @@ from __future__ import annotations
 import math
 import re
 from collections import Counter
-from pathlib import Path
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 from harness.validators import ensure_path_within_root
@@ -2605,7 +2608,10 @@ def make_hybrid_rag_tool(
         safe_dir = ensure_path_within_root(candidate, root)
         if not safe_dir.exists() or not safe_dir.is_dir():
             return {"query": query, "results": [], "error": "Directory not found."}
-        q_vec, q_low, scored, scanned = _tokenize(query), query.lower(), [], 0
+        q_vec = _tokenize(query)
+        q_low = query.lower()
+        scored: list[dict[str, Any]] = []
+        scanned = 0
         for fp in sorted(safe_dir.rglob("*.md")):
             if scanned >= max_files or fp.is_symlink():
                 continue
@@ -2628,7 +2634,7 @@ def make_hybrid_rag_tool(
                     "keyword_match": kw > 0,
                     "preview": text[:200],
                 })
-        scored.sort(key=lambda x: x["score"], reverse=True)
+        scored.sort(key=lambda x: float(x["score"]), reverse=True)
         return {
             "query": query,
             "mode": "hybrid_keyword_cosine",
@@ -2661,8 +2667,8 @@ def web_search(query: str, max_results: int = 3) -> dict[str, Any]:
 
 from __future__ import annotations
 
-from pathlib import Path
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 from harness.validators import ensure_path_within_root
@@ -2699,8 +2705,8 @@ def make_log_reader_tool(
 
 from __future__ import annotations
 
-from pathlib import Path
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 from harness.validators import ensure_path_within_root
@@ -2983,8 +2989,8 @@ class AssistantAI(BaseAgent):
 from __future__ import annotations
 
 import asyncio
-from pathlib import Path
 from collections.abc import Awaitable, Callable
+from pathlib import Path
 from typing import Any, TypeVar
 
 from agents.base_agent import BaseAgent

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import os
 import shutil
-import subprocess
+import subprocess  # nosec B404 — runs fixed docker CLI argv only
 import uuid
 from typing import Any
 
@@ -30,7 +30,7 @@ def build_docker_sandbox_cmd(
         "--network=none",
         "--read-only",
         "--cap-drop=ALL",
-        "--tmpfs", "/tmp:size=16m,noexec,nosuid,nodev",
+        "--tmpfs", "/tmp:size=16m,noexec,nosuid,nodev",  # nosec B108 — container-internal tmpfs
         f"--memory={memory}",
         f"--cpus={cpus}",
         f"--pids-limit={pids_limit}",
@@ -62,7 +62,7 @@ def docker_python_runner(
 
     cname, cmd = build_docker_sandbox_cmd(python_code, image=image, runtime=runtime)
     try:
-        proc = subprocess.run(
+        proc = subprocess.run(  # nosec B603 — argv built internally, no shell
             cmd, capture_output=True, text=True, timeout=timeout_seconds, check=False
         )
         return {
@@ -76,8 +76,8 @@ def docker_python_runner(
         }
     except subprocess.TimeoutExpired:
         # Actively kill the container so it does not keep running after CLI timeout
-        subprocess.run(["docker", "kill", cname], capture_output=True, text=True, check=False)
-        subprocess.run(["docker", "rm", "-f", cname], capture_output=True, text=True, check=False)
+        subprocess.run(["docker", "kill", cname], capture_output=True, text=True, check=False)  # nosec B603, B607
+        subprocess.run(["docker", "rm", "-f", cname], capture_output=True, text=True, check=False)  # nosec B603, B607
         return {
             "isolated": True,
             "available": True,

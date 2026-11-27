@@ -1,0 +1,17 @@
+# Protected Data Paths Policy (Pattern B — Existing Project Safety)
+# Agents MUST NEVER delete, overwrite, or truncate files matching these patterns.
+protected_patterns:
+  - "data/**"
+  - "backups/**"
+  - "migrations/**"
+  - "*.db"
+  - "*.sqlite"
+  - "*.sqlite3"
+  - "*.sql"
+  - ".env"
+  - ".env.*"
+
+git_guard:
+  warn_on_dirty_tree: true
+  warn_on_protected_branches: ["main", "master"]
+  recommended_branch_prefix: "ai-workforce/"

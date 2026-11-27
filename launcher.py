@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
-import subprocess
+import subprocess  # nosec B404 — only runs whitelisted CLI commands from AGENT_PROFILES
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -178,7 +178,7 @@ def launch_agent(profile: AgentProfile, project_root: Path, *, dry_run: bool = F
         return 0
 
     try:
-        proc = subprocess.run(list(profile.command), cwd=root, env=env, check=False)
+        proc = subprocess.run(list(profile.command), cwd=root, env=env, check=False)  # nosec B603
         return proc.returncode
     except KeyboardInterrupt:
         print("\n[!] User interrupted. Exiting gracefully.")
